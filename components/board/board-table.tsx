@@ -45,6 +45,9 @@ interface SortableBoardGroupProps {
   onItemsReorder: (groupId: string, itemIds: string[]) => void
   onColumnUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
   onColumnDelete?: (columnId: string) => void
+  onColumnsReorder?: (columnIds: string[]) => void
+  onColumnWidthChange?: (columnId: string, width: number) => void
+  onColumnWidthPersist?: (columnId: string, width: number) => void
   onItemOpen?: (item: BoardItem) => void
 }
 
@@ -85,6 +88,9 @@ interface BoardTableProps {
   onAutoAddDone?: () => void
   onColumnUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
   onColumnDelete?: (columnId: string) => void
+  onColumnsReorder?: (columnIds: string[]) => void
+  onColumnWidthChange?: (columnId: string, width: number) => void
+  onColumnWidthPersist?: (columnId: string, width: number) => void
   currentUserId?: string | null
 }
 
@@ -102,6 +108,9 @@ export function BoardTable({
   onAutoAddDone,
   onColumnUpdate,
   onColumnDelete,
+  onColumnsReorder,
+  onColumnWidthChange,
+  onColumnWidthPersist,
   currentUserId,
 }: BoardTableProps) {
   const [localValues, setLocalValues] = useState<BoardItemValue[]>(values)
@@ -217,6 +226,9 @@ export function BoardTable({
               onItemsReorder={handleItemsReorder}
               onColumnUpdate={onColumnUpdate}
               onColumnDelete={onColumnDelete}
+              onColumnsReorder={onColumnsReorder}
+              onColumnWidthChange={onColumnWidthChange}
+              onColumnWidthPersist={onColumnWidthPersist}
               onItemOpen={setSelectedItem}
             />
           ))}

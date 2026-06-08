@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getOrgContext } from '@/lib/boards/org-context'
+import { logFeedEvent, resolveItemFeedContext } from '@/lib/feed/log-feed-event'
 import type { BoardItemActivity } from '@/lib/boards/types'
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024
@@ -11,6 +12,7 @@ const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'imag
 function revalidateItemBoard(slug: string) {
   revalidatePath(`/boards/${slug}`)
   revalidatePath(`/boards/${slug}/kanban`)
+  revalidatePath('/atividades')
 }
 
 async function attachActivityUsers(
@@ -89,6 +91,26 @@ export async function createItemComment(itemId: string, body: string, slug: stri
     .single()
 
   if (error) return { error: error.message }
+
+  const feedContext = await resolveItemFeedContext(ctx.supabase, itemId)
+  if (feedContext) {
+    await logFeedEvent(ctx.supabase, {
+      organizationId: feedContext.organizationId,
+      userId: ctx.user.id,
+      category: 'board',
+      eventType: 'comment',
+      summary: `comentou em ${feedContext.itemName} (${feedContext.boardName})`,
+      body: trimmed,
+      entityType: 'board_item',
+      entityId: itemId,
+      metadata: {
+        board_slug: feedContext.boardSlug,
+        board_name: feedContext.boardName,
+        item_name: feedContext.itemName,
+        format: 'html',
+      },
+    })
+  }
 
   const [activity] = await attachActivityUsers(ctx.supabase, [data])
 

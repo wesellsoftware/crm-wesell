@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { BoardColumn, BoardData } from '@/lib/boards/types'
+import { reorderColumns, updateColumnSettings } from '@/app/actions/boards'
+import { sortColumnsByPosition } from '@/lib/boards/column-layout'
 import { PageTitle } from '@/components/page-title'
 import { BoardToolbar } from './board-toolbar'
 import { BoardTable } from './board-table'
@@ -22,12 +24,13 @@ interface BoardPageClientProps {
 export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [autoAddGroupId, setAutoAddGroupId] = useState<string | null>(null)
-  const [localColumns, setLocalColumns] = useState<BoardColumn[]>(data.columns)
+  const [localColumns, setLocalColumns] = useState(() => sortColumnsByPosition(data.columns))
+  const [, startColumnTransition] = useTransition()
   const { board, groups, items, values, members, relatedItems } = data
   const itemLabel = ITEM_LABELS[board.slug] ?? 'item'
 
   useEffect(() => {
-    setLocalColumns(data.columns)
+    setLocalColumns(sortColumnsByPosition(data.columns))
   }, [data.columns])
 
   function handleColumnUpdate(columnId: string, updates: Partial<BoardColumn>) {
@@ -38,6 +41,46 @@ export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
 
   function handleColumnDelete(columnId: string) {
     setLocalColumns(prev => prev.filter(col => col.id !== columnId))
+  }
+
+  function handleColumnsReorder(columnIds: string[]) {
+    setLocalColumns(prev => {
+      const map = new Map(prev.map(col => [col.id, col]))
+      return columnIds.map((id, index) => ({
+        ...map.get(id)!,
+        position: index,
+      }))
+    })
+    startColumnTransition(() => {
+      void reorderColumns(board.id, columnIds, board.slug)
+    })
+  }
+
+  function handleColumnWidthChange(columnId: string, width: number) {
+    setLocalColumns(prev =>
+      prev.map(col =>
+        col.id === columnId
+          ? { ...col, settings: { ...col.settings, width } }
+          : col
+      )
+    )
+  }
+
+  function handleColumnWidthPersist(columnId: string, width: number) {
+    setLocalColumns(prev => {
+      const next = prev.map(col =>
+        col.id === columnId
+          ? { ...col, settings: { ...col.settings, width } }
+          : col
+      )
+      const column = next.find(col => col.id === columnId)
+      if (column) {
+        startColumnTransition(() => {
+          void updateColumnSettings(columnId, column.settings, board.slug)
+        })
+      }
+      return next
+    })
   }
 
   function handleCreateClick() {
@@ -99,6 +142,9 @@ export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
             onAutoAddDone={() => setAutoAddGroupId(null)}
             onColumnUpdate={handleColumnUpdate}
             onColumnDelete={handleColumnDelete}
+            onColumnsReorder={handleColumnsReorder}
+            onColumnWidthChange={handleColumnWidthChange}
+            onColumnWidthPersist={handleColumnWidthPersist}
             currentUserId={currentUserId}
           />
         )}

@@ -12,6 +12,7 @@ import {
 import {
   SortableContext,
   arrayMove,
+  horizontalListSortingStrategy,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
@@ -19,6 +20,11 @@ import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BoardColumn, BoardGroup, BoardItem, BoardItemValue, CellValue, OrgMember, RelatedItem } from '@/lib/boards/types'
+import {
+  BOARD_HANDLE_COLUMN_WIDTH,
+  getColumnWidth,
+  LEADS_ACTION_COLUMN_WIDTH,
+} from '@/lib/boards/column-layout'
 import { CellRenderer, getItemValue } from './cells/cell-renderer'
 import { AddItemRow } from './add-item-row'
 import { BoardGroupFooter } from './board-group-footer'
@@ -26,6 +32,7 @@ import { updateGroup, updateItemName } from '@/app/actions/boards'
 import { MoveToContactsButton } from './move-to-contacts-button'
 import { MoveToNegociacoesButton } from './move-to-negociacoes-button'
 import { BoardColumnHeader } from './board-column-header'
+import { ColumnResizeHandle } from './column-resize-handle'
 import { GroupHeader } from './group-header'
 
 interface BoardGroupSectionProps {
@@ -47,8 +54,81 @@ interface BoardGroupSectionProps {
   onItemsReorder: (groupId: string, itemIds: string[]) => void
   onColumnUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
   onColumnDelete?: (columnId: string) => void
+  onColumnsReorder?: (columnIds: string[]) => void
+  onColumnWidthChange?: (columnId: string, width: number) => void
+  onColumnWidthPersist?: (columnId: string, width: number) => void
   dragHandleProps?: ComponentPropsWithoutRef<'button'>
   onItemOpen?: (item: BoardItem) => void
+}
+
+interface SortableColumnHeaderProps {
+  column: BoardColumn
+  slug: string
+  canReorder: boolean
+  onUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
+  onDelete?: (columnId: string) => void
+  onWidthChange?: (columnId: string, width: number) => void
+  onWidthPersist?: (columnId: string, width: number) => void
+}
+
+function SortableColumnHeader({
+  column,
+  slug,
+  canReorder,
+  onUpdate,
+  onDelete,
+  onWidthChange,
+  onWidthPersist,
+}: SortableColumnHeaderProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column.id,
+    data: { type: 'column' },
+    disabled: !canReorder,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    width: getColumnWidth(column),
+  }
+
+  return (
+    <th
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative px-3 py-2.5 text-left font-body text-xs text-we-paper/45 font-medium border-r border-white/[0.04] last:border-r-0',
+        isDragging && 'z-20 bg-white/[0.06] shadow-lg'
+      )}
+    >
+      <div className="flex items-center gap-1 min-w-0 group/colheader">
+        {canReorder && (
+          <button
+            type="button"
+            className="p-0.5 rounded text-we-paper/20 hover:text-we-paper/50 cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover/colheader:opacity-100 transition-opacity shrink-0"
+            aria-label="Arrastar para reordenar coluna"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={12} />
+          </button>
+        )}
+        <BoardColumnHeader
+          column={column}
+          slug={slug}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+        />
+      </div>
+      {onWidthChange && onWidthPersist && (
+        <ColumnResizeHandle
+          onResize={width => onWidthChange(column.id, width)}
+          onResizeEnd={width => onWidthPersist(column.id, width)}
+        />
+      )}
+    </th>
+  )
 }
 
 interface SortableItemRowProps {
@@ -132,7 +212,7 @@ function SortableItemRow({
       {columns.map(col => {
         if (col.is_primary) {
           return (
-            <td key={col.id} className="px-3 py-2 border-r border-white/[0.03]">
+            <td key={col.id} className="px-3 py-2 border-r border-white/[0.03] overflow-hidden">
               {isEditing ? (
                 <input
                   autoFocus
@@ -180,7 +260,7 @@ function SortableItemRow({
         return (
           <td
             key={col.id}
-            className="px-3 py-2 border-r border-white/[0.03] last:border-r-0"
+            className="px-3 py-2 border-r border-white/[0.03] last:border-r-0 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <CellRenderer
@@ -226,6 +306,9 @@ export function BoardGroupSection({
   onItemsReorder,
   onColumnUpdate,
   onColumnDelete,
+  onColumnsReorder,
+  onColumnWidthChange,
+  onColumnWidthPersist,
   dragHandleProps,
   onItemOpen,
 }: BoardGroupSectionProps) {
@@ -234,6 +317,7 @@ export function BoardGroupSection({
   const [editingNames, setEditingNames] = useState<Record<string, string>>({})
 
   const canReorder = !searchQuery
+  const canReorderColumns = !searchQuery && !!onColumnsReorder
 
   const groupItems = useMemo(
     () =>
@@ -245,6 +329,10 @@ export function BoardGroupSection({
   )
 
   const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
+
+  const columnSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
@@ -272,6 +360,19 @@ export function BoardGroupSection({
     onItemsReorder(group.id, reordered.map(i => i.id))
   }
 
+  function handleColumnDragEnd(event: DragEndEvent) {
+    if (event.active.data.current?.type !== 'column') return
+
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = columns.findIndex(col => col.id === active.id)
+    const newIndex = columns.findIndex(col => col.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    onColumnsReorder?.(arrayMove(columns, oldIndex, newIndex).map(col => col.id))
+  }
+
   const itemRows = groupItems.map(item => (
     <SortableItemRow
       key={item.id}
@@ -292,6 +393,11 @@ export function BoardGroupSection({
     />
   ))
 
+  const tableMinWidth =
+    BOARD_HANDLE_COLUMN_WIDTH +
+    columns.reduce((sum, col) => sum + getColumnWidth(col), 0) +
+    (slug === 'leads' ? LEADS_ACTION_COLUMN_WIDTH : 0)
+
   return (
     <div className="mb-5">
       <GroupHeader
@@ -307,26 +413,63 @@ export function BoardGroupSection({
 
       {!collapsed && (
         <div className="glass rounded-xl overflow-x-auto glass-scrollbar">
-          <table className="w-full min-w-[900px] border-collapse">
+          <table className="w-full border-collapse table-fixed" style={{ minWidth: tableMinWidth }}>
+            <colgroup>
+              <col style={{ width: BOARD_HANDLE_COLUMN_WIDTH }} />
+              {columns.map(col => (
+                <col key={col.id} style={{ width: getColumnWidth(col) }} />
+              ))}
+              {slug === 'leads' && <col style={{ width: LEADS_ACTION_COLUMN_WIDTH }} />}
+            </colgroup>
             <thead>
               <tr className="border-b border-white/[0.06] bg-white/[0.03]">
-                <th className="w-10 px-2 py-2.5 border-r border-white/[0.04]" />
-                {columns.map(col => (
-                  <th
-                    key={col.id}
-                    className={cn(
-                      'px-3 py-2.5 text-left font-body text-xs text-we-paper/45 font-medium whitespace-nowrap border-r border-white/[0.04] last:border-r-0',
-                      col.is_primary && 'min-w-[180px]'
-                    )}
+                <th className="px-2 py-2.5 border-r border-white/[0.04]" />
+                {canReorderColumns ? (
+                  <DndContext
+                    sensors={columnSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleColumnDragEnd}
                   >
-                    <BoardColumnHeader
-                      column={col}
-                      slug={slug}
-                      onUpdate={onColumnUpdate}
-                      onDelete={onColumnDelete}
-                    />
-                  </th>
-                ))}
+                    <SortableContext
+                      items={columns.map(col => col.id)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {columns.map(col => (
+                        <SortableColumnHeader
+                          key={col.id}
+                          column={col}
+                          slug={slug}
+                          canReorder={canReorderColumns}
+                          onUpdate={onColumnUpdate}
+                          onDelete={onColumnDelete}
+                          onWidthChange={onColumnWidthChange}
+                          onWidthPersist={onColumnWidthPersist}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  columns.map(col => (
+                    <th
+                      key={col.id}
+                      style={{ width: getColumnWidth(col) }}
+                      className="relative px-3 py-2.5 text-left font-body text-xs text-we-paper/45 font-medium border-r border-white/[0.04] last:border-r-0"
+                    >
+                      <BoardColumnHeader
+                        column={col}
+                        slug={slug}
+                        onUpdate={onColumnUpdate}
+                        onDelete={onColumnDelete}
+                      />
+                      {onColumnWidthChange && onColumnWidthPersist && (
+                        <ColumnResizeHandle
+                          onResize={width => onColumnWidthChange(col.id, width)}
+                          onResizeEnd={width => onColumnWidthPersist(col.id, width)}
+                        />
+                      )}
+                    </th>
+                  ))
+                )}
                 {slug === 'leads' && (
                   <th className="px-3 py-2.5 text-left font-body text-xs text-we-paper/45 font-medium">
                     Ação

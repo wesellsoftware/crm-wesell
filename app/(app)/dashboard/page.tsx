@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOrganizationFeed } from '@/app/actions/feed'
 import { getDashboardBoardStats, getNegociacoesAnalytics } from '@/lib/boards/queries'
 import { DealsByStageChart } from '@/components/dashboard/deals-by-stage-chart'
 import { PipelineKpis } from '@/components/dashboard/pipeline-kpis'
@@ -6,29 +7,19 @@ import { SalesKpis } from '@/components/dashboard/sales-kpis'
 import { RevenueByProductChart } from '@/components/relatorios/revenue-by-product-chart'
 import { TopSellersRanking } from '@/components/relatorios/top-sellers-ranking'
 import { PageTitle } from '@/components/page-title'
+import { formatRelativeTime } from '@/lib/feed/format-feed-event'
+import { FEED_CATEGORY_LABELS } from '@/lib/feed/types'
+import Link from 'next/link'
 export const dynamic = 'force-dynamic'
-
-function activityTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    call: 'Ligação', email: 'E-mail', meeting: 'Reunião', task: 'Tarefa', note: 'Nota',
-  }
-  return map[type] ?? type
-}
-
-function activityTypeColor(type: string) {
-  const map: Record<string, string> = {
-    call: '#4342F5', email: '#45F47F', meeting: '#D7FE65', task: '#7845F4', note: 'rgba(237,237,235,0.4)',
-  }
-  return map[type] ?? 'rgba(237,237,235,0.4)'
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [boardStats, analytics] = await Promise.all([
+  const [boardStats, analytics, feedPage] = await Promise.all([
     getDashboardBoardStats(),
     getNegociacoesAnalytics(),
+    getOrganizationFeed({ limit: 5 }),
   ])
 
   const { data: profile } = await supabase
@@ -37,12 +28,7 @@ export default async function DashboardPage() {
     .eq('id', user?.id ?? '')
     .single()
 
-  const { data: recentActivities } = await supabase
-    .from('activities')
-    .select('id, type, title, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
+  const recentEvents = feedPage.events
   const today = new Date()
   const openCount = boardStats?.openCount ?? 0
   const pipelineValue = boardStats?.pipelineValue ?? 0
@@ -107,23 +93,28 @@ export default async function DashboardPage() {
         </div>
 
         <div className="glass rounded-xl p-6 flex flex-col gap-4">
-          <p className="font-body text-sm font-semibold text-we-paper/70">Atividades recentes</p>
-          {!recentActivities?.length ? (
+          <div className="flex items-center justify-between">
+            <p className="font-body text-sm font-semibold text-we-paper/70">Atividades recentes</p>
+            <Link
+              href="/atividades"
+              className="font-mono text-[10px] text-we-blue/70 hover:text-we-blue transition-colors"
+            >
+              Ver todas
+            </Link>
+          </div>
+          {!recentEvents.length ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="font-mono text-xs text-we-paper/25">Nenhuma atividade ainda</p>
             </div>
           ) : (
             <ul className="space-y-3">
-              {recentActivities.map((act) => (
-                <li key={act.id} className="flex items-start gap-3">
-                  <span
-                    className="mt-1 size-2 rounded-full shrink-0"
-                    style={{ background: activityTypeColor(act.type) }}
-                  />
+              {recentEvents.map(event => (
+                <li key={event.id} className="flex items-start gap-3">
+                  <span className="mt-1.5 size-2 rounded-full shrink-0 bg-we-blue/60" />
                   <div className="min-w-0">
-                    <p className="font-body text-sm text-we-paper/80 truncate">{act.title}</p>
+                    <p className="font-body text-sm text-we-paper/80 line-clamp-2">{event.summary}</p>
                     <p className="font-mono text-[11px] text-we-paper/35">
-                      {activityTypeLabel(act.type)}
+                      {FEED_CATEGORY_LABELS[event.category]} · {formatRelativeTime(event.created_at)}
                     </p>
                   </div>
                 </li>

@@ -3,6 +3,8 @@ import { ProfileForm } from '@/components/configuracoes/profile-form'
 import { OrgForm } from '@/components/configuracoes/org-form'
 import { PageTitle } from '@/components/page-title'
 import { StagesManager } from '@/components/configuracoes/stages-manager'
+import { WebhooksManager } from '@/components/configuracoes/webhooks-manager'
+import { headers } from 'next/headers'
 
 export default async function ConfiguracoesPage() {
   const supabase = await createClient()
@@ -13,12 +15,19 @@ export default async function ConfiguracoesPage() {
     { data: org },
     { data: stages },
     { data: members },
+    { data: webhooks },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name, role, organization_id').eq('id', user?.id ?? '').single(),
     supabase.from('organizations').select('id, name').single(),
     supabase.from('stages').select('id, name, color, position').order('position'),
     supabase.from('profiles').select('id, full_name, role, created_at').order('created_at'),
+    supabase.from('organization_webhooks').select('id, event, url, is_active, created_at').order('created_at'),
   ])
+
+  const requestHeaders = await headers()
+  const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host')
+  const protocol = requestHeaders.get('x-forwarded-proto') ?? 'https'
+  const apiEndpoint = host ? `${protocol}://${host}/api/leads` : '/api/leads'
 
   const isAdmin = profile?.role === 'admin'
 
@@ -66,6 +75,12 @@ export default async function ConfiguracoesPage() {
       <section className="glass rounded-xl p-6 space-y-4">
         <h2 className="font-body text-base font-semibold text-we-paper/70">Etapas do funil</h2>
         <StagesManager stages={stages ?? []} isAdmin={isAdmin} />
+      </section>
+
+      {/* Integrations */}
+      <section className="glass rounded-xl p-6 space-y-4">
+        <h2 className="font-body text-base font-semibold text-we-paper/70">Integrações</h2>
+        <WebhooksManager webhooks={webhooks ?? []} isAdmin={isAdmin} apiEndpoint={apiEndpoint} />
       </section>
     </div>
   )

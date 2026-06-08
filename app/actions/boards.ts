@@ -11,6 +11,8 @@ import {
 import { canDeleteBoardColumn, canRenameBoardColumn } from '@/lib/boards/fixed-columns'
 import { canDeleteBoardGroup } from '@/lib/boards/fixed-groups'
 import { logBoardItemActivity } from '@/lib/boards/log-activity'
+import { formatActivityMessage } from '@/lib/boards/format-activity'
+import { logFeedEvent } from '@/lib/feed/log-feed-event'
 import type {
   BoardColumn,
   CellValue,
@@ -21,6 +23,7 @@ import type {
 function revalidateBoard(slug: string) {
   const normalized = slug.replace(/\/kanban$/, '')
   revalidatePath(`/boards/${normalized}`)
+  revalidatePath('/atividades')
   if (normalized === 'negociacoes') {
     revalidatePath('/boards/negociacoes/kanban')
   }
@@ -365,8 +368,37 @@ export async function deleteItem(itemId: string, slug: string) {
   const ctx = await getOrgContext()
   if (!ctx) return { error: 'Não autenticado' }
 
+  const { data: item } = await ctx.supabase
+    .from('board_items')
+    .select('name, board:boards(slug, name, organization_id)')
+    .eq('id', itemId)
+    .single()
+
   const { error } = await ctx.supabase.from('board_items').delete().eq('id', itemId)
   if (error) return { error: error.message }
+
+  if (item) {
+    const board = item.board as unknown as {
+      slug: string
+      name: string
+      organization_id: string
+    }
+    await logFeedEvent(ctx.supabase, {
+      organizationId: board.organization_id,
+      userId: ctx.user.id,
+      category: 'board',
+      eventType: 'item_deleted',
+      summary: `excluiu ${item.name} de ${board.name}`,
+      entityType: 'board_item',
+      entityId: itemId,
+      metadata: {
+        board_slug: board.slug,
+        board_name: board.name,
+        item_name: item.name,
+      },
+    })
+  }
+
   revalidateBoard(slug)
   return { success: true }
 }
@@ -395,6 +427,18 @@ export async function upsertItemValue(itemId: string, columnId: string, value: C
   const valuesChanged = JSON.stringify(oldValue) !== JSON.stringify(value)
 
   if (valuesChanged && column) {
+    const { detail } = formatActivityMessage(
+      'field_update',
+      {
+        column_id: columnId,
+        column_name: column.name,
+        new_value: value,
+      },
+      [column as BoardColumn],
+      [],
+      {}
+    )
+
     await logBoardItemActivity(ctx.supabase, {
       itemId,
       userId: ctx.user.id,
@@ -405,6 +449,7 @@ export async function upsertItemValue(itemId: string, columnId: string, value: C
         column_type: column.type,
         old_value: oldValue,
         new_value: value,
+        detail,
       },
     })
   }
@@ -477,6 +522,35 @@ export async function moveLeadToContacts(leadItemId: string) {
     .single()
 
   if (createError || !newContact) return { error: createError?.message ?? 'Erro ao criar contato' }
+
+  await logFeedEvent(supabase, {
+    organizationId,
+    userId: user.id,
+    category: 'board',
+    eventType: 'item_converted',
+    summary: `converteu lead ${leadItem.name} para contato`,
+    entityType: 'board_item',
+    entityId: leadItemId,
+    metadata: {
+      board_slug: 'leads',
+      board_name: 'Leads',
+      item_name: leadItem.name,
+      target_board_slug: 'contatos',
+      target_item_id: newContact.id,
+    },
+  })
+
+  await logBoardItemActivity(supabase, {
+    itemId: newContact.id,
+    userId: user.id,
+    type: 'created',
+    feedContext: {
+      organizationId,
+      boardSlug: 'contatos',
+      boardName: 'Contatos',
+      itemName: leadItem.name,
+    },
+  })
 
   const fieldMapping: Record<string, string> = {
     'Empresa': 'Conta',
@@ -580,6 +654,35 @@ export async function moveLeadToNegociacoes(leadItemId: string) {
     return { error: createError?.message ?? 'Erro ao criar negociação' }
   }
 
+  await logFeedEvent(supabase, {
+    organizationId,
+    userId: user.id,
+    category: 'board',
+    eventType: 'item_converted',
+    summary: `converteu lead ${leadItem.name} para negociação`,
+    entityType: 'board_item',
+    entityId: leadItemId,
+    metadata: {
+      board_slug: 'leads',
+      board_name: 'Leads',
+      item_name: leadItem.name,
+      target_board_slug: 'negociacoes',
+      target_item_id: newDeal.id,
+    },
+  })
+
+  await logBoardItemActivity(supabase, {
+    itemId: newDeal.id,
+    userId: user.id,
+    type: 'created',
+    feedContext: {
+      organizationId,
+      boardSlug: 'negociacoes',
+      boardName: 'Negociações',
+      itemName: `Negociação ${leadItem.name}`,
+    },
+  })
+
   for (const col of negociacoesColumns ?? []) {
     if (col.name === 'Cronograma' && col.type === 'timeline' && valueMap['Cronograma']) {
       await supabase.from('board_item_values').insert({
@@ -635,6 +738,10 @@ export async function updateDealEtapa(itemId: string, optionId: string, slug: st
 
   if (!stageCol) return { error: 'Coluna Etapa não encontrada' }
 
+  const options = (stageCol.settings as { options?: { id: string; label: string }[] })?.options ?? []
+  const selected = options.find(o => o.id === optionId)
+  const detail = selected?.label ?? '—'
+
   const { error } = await ctx.supabase
     .from('board_item_values')
     .upsert(
@@ -644,8 +751,18 @@ export async function updateDealEtapa(itemId: string, optionId: string, slug: st
 
   if (error) return { error: error.message }
 
-  const options = (stageCol.settings as { options?: { id: string; label: string }[] })?.options ?? []
-  const selected = options.find(o => o.id === optionId)
+  await logBoardItemActivity(ctx.supabase, {
+    itemId,
+    userId: ctx.user.id,
+    type: 'field_update',
+    metadata: {
+      column_id: stageCol.id,
+      column_name: 'Etapa',
+      new_value: { option_id: optionId },
+      detail,
+    },
+  })
+
   const isWon = selected ? isWonStageLabel(selected.label) : false
 
   await syncDealWonState(ctx.supabase, itemId, board.id, isWon)

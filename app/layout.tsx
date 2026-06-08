@@ -18,6 +18,11 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "WeSell CRM",
   description: "CRM da WeSell — feche mais, mais rápido.",
+  icons: {
+    icon: "/assets/logo-pequeno.png",
+    shortcut: "/assets/logo-pequeno.png",
+    apple: "/assets/logo-pequeno.png",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

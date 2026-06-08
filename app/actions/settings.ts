@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logFeedEvent } from '@/lib/feed/log-feed-event'
 
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
@@ -51,13 +52,35 @@ export async function updateProfile(_: unknown, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
+  const fullName = formData.get('full_name') as string
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name: formData.get('full_name') as string })
+    .update({ full_name: fullName })
     .eq('id', user.id)
 
   if (error) return { error: error.message }
+
+  if (profile) {
+    await logFeedEvent(supabase, {
+      organizationId: profile.organization_id,
+      userId: user.id,
+      category: 'settings',
+      eventType: 'profile_updated',
+      summary: `atualizou o perfil para ${fullName}`,
+      entityType: 'profile',
+      entityId: user.id,
+    })
+  }
+
   revalidatePath('/configuracoes')
+  revalidatePath('/atividades')
   return { success: true }
 }
 
@@ -82,13 +105,27 @@ export async function updateOrg(_: unknown, formData: FormData) {
     .single()
   if (!profile || profile.role !== 'admin') return { error: 'Apenas administradores podem editar a organização.' }
 
+  const orgName = formData.get('name') as string
+
   const { error } = await supabase
     .from('organizations')
-    .update({ name: formData.get('name') as string })
+    .update({ name: orgName })
     .eq('id', profile.organization_id)
 
   if (error) return { error: error.message }
+
+  await logFeedEvent(supabase, {
+    organizationId: profile.organization_id,
+    userId: user.id,
+    category: 'settings',
+    eventType: 'org_updated',
+    summary: `atualizou a organização para ${orgName}`,
+    entityType: 'organization',
+    entityId: profile.organization_id,
+  })
+
   revalidatePath('/configuracoes')
+  revalidatePath('/atividades')
   return { success: true }
 }
 
@@ -112,40 +149,95 @@ export async function createStage(_: unknown, formData: FormData) {
     .limit(1)
     .single()
 
-  const { error } = await supabase.from('stages').insert({
+  const stageName = formData.get('name') as string
+
+  const { data: stage, error } = await supabase.from('stages').insert({
     organization_id: profile.organization_id,
-    name: formData.get('name') as string,
+    name: stageName,
     color: formData.get('color') as string || '#4342F5',
     position: (lastStage?.position ?? 0) + 1,
-  })
+  }).select('id').single()
 
   if (error) return { error: error.message }
+
+  await logFeedEvent(supabase, {
+    organizationId: profile.organization_id,
+    userId: user.id,
+    category: 'settings',
+    eventType: 'stage_created',
+    summary: `criou etapa ${stageName} no funil`,
+    entityType: 'stage',
+    entityId: stage?.id,
+  })
+
   revalidatePath('/configuracoes')
   revalidatePath('/funil')
+  revalidatePath('/atividades')
   return { success: true }
 }
 
 export async function updateStage(stageId: string, name: string, color: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data: stage } = await supabase
+    .from('stages')
+    .select('organization_id, name')
+    .eq('id', stageId)
+    .single()
+
   const { error } = await supabase
     .from('stages')
     .update({ name, color })
     .eq('id', stageId)
   if (error) return { error: error.message }
+
+  if (stage && user) {
+    await logFeedEvent(supabase, {
+      organizationId: stage.organization_id,
+      userId: user.id,
+      category: 'settings',
+      eventType: 'stage_updated',
+      summary: `atualizou etapa ${stage.name} para ${name}`,
+      entityType: 'stage',
+      entityId: stageId,
+    })
+  }
+
   revalidatePath('/configuracoes')
   revalidatePath('/funil')
+  revalidatePath('/atividades')
   return { success: true }
 }
 
 export async function reorderStages(stageIds: string[]) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('organization_id').eq('id', user.id).single()
+    : { data: null }
+
   await Promise.all(
     stageIds.map((id, index) =>
       supabase.from('stages').update({ position: index }).eq('id', id)
     )
   )
+
+  if (profile && user) {
+    await logFeedEvent(supabase, {
+      organizationId: profile.organization_id,
+      userId: user.id,
+      category: 'settings',
+      eventType: 'stage_reordered',
+      summary: 'reordenou as etapas do funil',
+      entityType: 'stage',
+    })
+  }
+
   revalidatePath('/configuracoes')
   revalidatePath('/funil')
+  revalidatePath('/atividades')
 }
 
 const DEFAULT_STAGES = [
@@ -186,7 +278,29 @@ export async function seedDefaultStages() {
 
 export async function deleteStage(stageId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data: stage } = await supabase
+    .from('stages')
+    .select('organization_id, name')
+    .eq('id', stageId)
+    .single()
+
   await supabase.from('stages').delete().eq('id', stageId)
+
+  if (stage && user) {
+    await logFeedEvent(supabase, {
+      organizationId: stage.organization_id,
+      userId: user.id,
+      category: 'settings',
+      eventType: 'stage_deleted',
+      summary: `excluiu etapa ${stage.name} do funil`,
+      entityType: 'stage',
+      entityId: stageId,
+    })
+  }
+
   revalidatePath('/configuracoes')
   revalidatePath('/funil')
+  revalidatePath('/atividades')
 }

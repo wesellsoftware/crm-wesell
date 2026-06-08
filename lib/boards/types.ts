@@ -22,6 +22,7 @@ export interface ColumnSettings {
   options?: StatusOption[]
   target_board_slug?: string
   currency?: string
+  width?: number
 }
 
 export interface Board {
