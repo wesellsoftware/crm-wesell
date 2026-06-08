@@ -1,0 +1,169 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Coolvetica — carregada via @font-face; sem falha de build se o woff2 ainda não estiver no repo */
+@font-face {
+  font-family: 'Coolvetica';
+  src: url('/fonts/coolvetica/coolvetica.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Shadcn semantic tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 2);
+  --radius-xl: calc(var(--radius) * 3);
+  --radius-full: 9999px;
+
+  /* WeSell brand colors — geram bg-we-*, text-we-*, border-we-* etc. */
+  --color-we-blue: #4342F5;
+  --color-we-blue-deep: #4241DF;
+  --color-we-lime: #D7FE65;
+  --color-we-ink: #2F2935;
+  --color-we-paper: #EDEDEB;
+  --color-we-white: #FFFFFF;
+  --color-we-green: #45F47F;
+  --color-we-red: #F44545;
+  --color-we-purple: #7845F4;
+  --color-we-yellow: #EDED4A;
+
+  /* WeSell fonts — geram font-display, font-body, font-mono */
+  --font-display: 'Coolvetica', system-ui, sans-serif;
+  --font-body: var(--font-bree-serif, 'Bree Serif', Georgia, serif);
+  --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono', monospace);
+  --font-sans: var(--font-bree-serif, system-ui, sans-serif);
+}
+
+:root {
+  /* WeSell CSS custom properties (uso direto em style={}) */
+  --we-blue: #4342F5;
+  --we-blue-deep: #4241DF;
+  --we-lime: #D7FE65;
+  --we-ink: #2F2935;
+  --we-paper: #EDEDEB;
+  --we-white: #FFFFFF;
+  --we-green: #45F47F;
+  --we-red: #F44545;
+  --we-purple: #7845F4;
+  --we-yellow: #EDED4A;
+
+  --shadow-sm: 0 1px 2px rgba(47,41,53,.08);
+  --shadow-md: 0 4px 12px rgba(47,41,53,.12);
+  --shadow-lg: 0 12px 32px rgba(47,41,53,.16);
+
+  /* Shadcn semantic tokens → WeSell */
+  --radius: 0.5rem;
+  --background: #FFFFFF;
+  --foreground: #2F2935;
+  --card: #FFFFFF;
+  --card-foreground: #2F2935;
+  --popover: #FFFFFF;
+  --popover-foreground: #2F2935;
+  --primary: #4342F5;
+  --primary-foreground: #FFFFFF;
+  --secondary: #D7FE65;
+  --secondary-foreground: #2F2935;
+  --muted: #EDEDEB;
+  --muted-foreground: rgba(47,41,53,0.55);
+  --accent: #EDEDEB;
+  --accent-foreground: #2F2935;
+  --destructive: #F44545;
+  --border: rgba(47,41,53,0.12);
+  --input: rgba(47,41,53,0.08);
+  --ring: #4342F5;
+  --chart-1: #4342F5;
+  --chart-2: #45F47F;
+  --chart-3: #D7FE65;
+  --chart-4: #7845F4;
+  --chart-5: #F44545;
+  /* Sidebar dark by design */
+  --sidebar: #2F2935;
+  --sidebar-foreground: #EDEDEB;
+  --sidebar-primary: #4342F5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(237,237,235,0.08);
+  --sidebar-accent-foreground: #EDEDEB;
+  --sidebar-border: rgba(237,237,235,0.12);
+  --sidebar-ring: #4342F5;
+}
+
+.dark {
+  --background: #2F2935;
+  --foreground: #EDEDEB;
+  --card: rgba(237,237,235,0.04);
+  --card-foreground: #EDEDEB;
+  --popover: #2F2935;
+  --popover-foreground: #EDEDEB;
+  --primary: #4342F5;
+  --primary-foreground: #FFFFFF;
+  --secondary: #D7FE65;
+  --secondary-foreground: #2F2935;
+  --muted: rgba(237,237,235,0.08);
+  --muted-foreground: rgba(237,237,235,0.55);
+  --accent: rgba(237,237,235,0.08);
+  --accent-foreground: #EDEDEB;
+  --destructive: #F44545;
+  --border: rgba(237,237,235,0.12);
+  --input: rgba(237,237,235,0.08);
+  --ring: #D7FE65;
+  --chart-1: #4342F5;
+  --chart-2: #45F47F;
+  --chart-3: #D7FE65;
+  --chart-4: #7845F4;
+  --chart-5: #F44545;
+  --sidebar: #2F2935;
+  --sidebar-foreground: #EDEDEB;
+  --sidebar-primary: #4342F5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(237,237,235,0.08);
+  --sidebar-accent-foreground: #EDEDEB;
+  --sidebar-border: rgba(237,237,235,0.12);
+  --sidebar-ring: #4342F5;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+}
