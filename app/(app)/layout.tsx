@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         avatarUrl={profile?.avatar_url ?? null}
         fullName={profile?.full_name ?? ""}
       />
-      <main className="relative flex-1 overflow-y-auto">{children}</main>
+      <main className="relative flex-1 overflow-y-auto glass-scrollbar">{children}</main>
     </div>
   )
 }

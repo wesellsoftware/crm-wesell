@@ -1,5 +1,8 @@
+import { unstable_noStore as noStore } from 'next/cache'
 import { ensureOrganizationBoards } from '@/lib/boards/seed'
 import { getOrgContext } from '@/lib/boards/org-context'
+import { computeNegociacoesAnalytics, type NegociacoesAnalytics } from '@/lib/boards/analytics'
+import { isClosedGroupName, isWonGroupName } from '@/lib/boards/won-group'
 import type {
   Board,
   BoardColumn,
@@ -42,7 +45,7 @@ export async function getBoardBySlug(slug: string): Promise<BoardData | null> {
     supabase.from('board_groups').select('*').eq('board_id', board.id).order('position'),
     supabase.from('board_columns').select('*').eq('board_id', board.id).order('position'),
     supabase.from('board_items').select('*').eq('board_id', board.id).order('position'),
-    supabase.from('profiles').select('id, full_name').eq('organization_id', organizationId),
+    supabase.from('profiles').select('id, full_name, avatar_url').eq('organization_id', organizationId),
     supabase.from('boards').select('id, slug, name').eq('organization_id', organizationId).order('position'),
   ])
 
@@ -122,31 +125,24 @@ export async function getNegociacoesKanbanData() {
   const data = await getBoardBySlug('negociacoes')
   if (!data) return null
 
-  const stageColumn = data.columns.find(c => c.name === 'Etapa' && c.type === 'status')
-  const stages = stageColumn?.settings.options ?? []
+  const groups = [...data.groups].sort((a, b) => a.position - b.position)
 
-  const itemsByStage: Record<string, typeof data.items> = {}
-  for (const stage of stages) {
-    itemsByStage[stage.id] = []
+  const itemsByGroup: Record<string, typeof data.items> = {}
+  for (const group of groups) {
+    itemsByGroup[group.id] = []
   }
-  itemsByStage['__none__'] = []
 
   for (const item of data.items) {
-    const stageValue = data.values.find(
-      v => v.item_id === item.id && v.column_id === stageColumn?.id
-    )
-    const optionId = (stageValue?.value as { option_id?: string })?.option_id
-    if (optionId && itemsByStage[optionId]) {
-      itemsByStage[optionId].push(item)
-    } else {
-      itemsByStage['__none__'].push(item)
+    if (itemsByGroup[item.group_id]) {
+      itemsByGroup[item.group_id].push(item)
     }
   }
 
-  return { ...data, stages, itemsByStage, stageColumnId: stageColumn?.id }
+  return { ...data, groups, itemsByGroup }
 }
 
 export async function getDashboardBoardStats() {
+  noStore()
   const ctx = await getOrgContext()
   if (!ctx) return null
 
@@ -162,48 +158,137 @@ export async function getDashboardBoardStats() {
 
   if (!board) return null
 
-  const [{ data: items }, { data: columns }, { data: values }] = await Promise.all([
+  const [{ data: items }, { data: columns }, { data: groups }] = await Promise.all([
     supabase.from('board_items').select('id, name, group_id').eq('board_id', board.id),
     supabase.from('board_columns').select('*').eq('board_id', board.id),
-    supabase.from('board_item_values').select('*'),
+    supabase.from('board_groups').select('*').eq('board_id', board.id).order('position'),
   ])
 
-  const stageCol = (columns ?? []).find(c => c.name === 'Etapa')
   const valueCol = (columns ?? []).find(c => c.type === 'currency')
-  const groups = await supabase.from('board_groups').select('*').eq('board_id', board.id).order('position')
+  const sortedGroups = [...(groups ?? [])].sort((a, b) => a.position - b.position)
+  const groupById = new Map(sortedGroups.map(g => [g.id, g]))
 
-  const activeGroup = groups.data?.find(g => g.name === 'Oportunidades ativas')
-  const wonGroup = groups.data?.find(g => g.name === 'Fechado/Ganho')
+  const itemIds = (items ?? []).map(i => i.id)
+  let values: BoardItemValue[] = []
+  if (itemIds.length > 0) {
+    const { data: rawValues } = await supabase
+      .from('board_item_values')
+      .select('*')
+      .in('item_id', itemIds)
+    values = (rawValues ?? []) as BoardItemValue[]
+  }
 
-  const activeItems = (items ?? []).filter(i => i.group_id === activeGroup?.id)
-  const wonItems = (items ?? []).filter(i => i.group_id === wonGroup?.id)
+  const isClosedGroup = (groupId: string) => {
+    const group = groupById.get(groupId)
+    return group ? isClosedGroupName(group.name) : false
+  }
+
+  const openItems = (items ?? []).filter(i => !isClosedGroup(i.group_id))
+  const wonItems = (items ?? []).filter(i => {
+    const group = groupById.get(i.group_id)
+    return group ? isWonGroupName(group.name) : false
+  })
 
   let pipelineValue = 0
-  for (const item of activeItems) {
-    const val = (values ?? []).find(v => v.item_id === item.id && v.column_id === valueCol?.id)
+  for (const item of openItems) {
+    const val = values.find(v => v.item_id === item.id && v.column_id === valueCol?.id)
     pipelineValue += Number((val?.value as { amount?: number })?.amount ?? 0)
   }
 
-  const chartData = (stageCol?.settings as { options?: { id: string; label: string; color: string }[] })?.options?.map(opt => {
-    const stageItems = (items ?? []).filter(item => {
-      const sv = (values ?? []).find(v => v.item_id === item.id && v.column_id === stageCol.id)
-      return (sv?.value as { option_id?: string })?.option_id === opt.id
-    })
-    const stageValue = stageItems.reduce((sum, item) => {
-      const val = (values ?? []).find(v => v.item_id === item.id && v.column_id === valueCol?.id)
+  const chartData = sortedGroups.map(group => {
+    const groupItems = (items ?? []).filter(i => i.group_id === group.id)
+    const stageValue = groupItems.reduce((sum, item) => {
+      const val = values.find(v => v.item_id === item.id && v.column_id === valueCol?.id)
       return sum + Number((val?.value as { amount?: number })?.amount ?? 0)
     }, 0)
-    return { name: opt.label, count: stageItems.length, value: stageValue, color: opt.color }
-  }) ?? []
+    return { name: group.name, count: groupItems.length, value: stageValue, color: group.color }
+  })
 
   return {
-    openCount: activeItems.length,
+    openCount: openItems.length,
     pipelineValue,
     wonCount: wonItems.length,
-    conversionRate: activeItems.length + wonItems.length > 0
-      ? Math.round((wonItems.length / (activeItems.length + wonItems.length)) * 100)
+    conversionRate: openItems.length + wonItems.length > 0
+      ? Math.round((wonItems.length / (openItems.length + wonItems.length)) * 100)
       : 0,
     chartData,
     recentItems: (items ?? []).slice(0, 5),
   }
+}
+
+export async function getNegociacoesAnalytics(): Promise<NegociacoesAnalytics | null> {
+  noStore()
+  const ctx = await getOrgContext()
+  if (!ctx) return null
+
+  const { supabase, organizationId } = ctx
+  await ensureOrganizationBoards(organizationId)
+
+  const { data: board } = await supabase
+    .from('boards')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('slug', 'negociacoes')
+    .single()
+
+  if (!board) return null
+
+  const [{ data: items }, { data: columns }] = await Promise.all([
+    supabase
+      .from('board_items')
+      .select('id, created_at, closed_at')
+      .eq('board_id', board.id)
+      .not('closed_at', 'is', null),
+    supabase.from('board_columns').select('*').eq('board_id', board.id),
+  ])
+
+  const valueCol = (columns ?? []).find(c => c.name === 'Valor da negociação' && c.type === 'currency')
+  const productCol = (columns ?? []).find(c => c.name === 'Produto' && c.type === 'tags')
+  const sellerCol = (columns ?? []).find(c => c.name === 'Responsável' && c.type === 'person')
+  const productOptions = (productCol?.settings as { options?: { id: string; label: string; color: string }[] })?.options ?? []
+  const productById = new Map(productOptions.map(o => [o.id, o]))
+  const productColors = Object.fromEntries(productOptions.map(o => [o.label, o.color]))
+
+  const { data: members } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .eq('organization_id', organizationId)
+
+  const itemIds = (items ?? []).map(i => i.id)
+  if (itemIds.length === 0) {
+    return computeNegociacoesAnalytics([], productColors, members ?? [])
+  }
+
+  const { data: values } = await supabase
+    .from('board_item_values')
+    .select('*')
+    .in('item_id', itemIds)
+
+  const wonDeals = (items ?? []).map(item => {
+    const amountVal = (values ?? []).find(
+      v => v.item_id === item.id && v.column_id === valueCol?.id
+    )
+    const productVal = (values ?? []).find(
+      v => v.item_id === item.id && v.column_id === productCol?.id
+    )
+    const sellerVal = (values ?? []).find(
+      v => v.item_id === item.id && v.column_id === sellerCol?.id
+    )
+    const optionIds = (productVal?.value as { option_ids?: string[] })?.option_ids ?? []
+    const productLabels = optionIds
+      .map(id => productById.get(id)?.label)
+      .filter((label): label is string => Boolean(label))
+    const sellerIds = (sellerVal?.value as { user_ids?: string[] })?.user_ids ?? []
+
+    return {
+      id: item.id,
+      amount: Number((amountVal?.value as { amount?: number })?.amount ?? 0),
+      createdAt: item.created_at,
+      closedAt: item.closed_at as string,
+      productLabels,
+      sellerIds,
+    }
+  })
+
+  return computeNegociacoesAnalytics(wonDeals, productColors, members ?? [])
 }

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { StatusOption } from '@/lib/boards/types'
+import { CellPopover, cellPopoverOptionClass } from './cell-popover'
 
 interface TagsCellProps {
   value: string[]
@@ -12,11 +13,13 @@ interface TagsCellProps {
 
 export function TagsCell({ value, options, onChange }: TagsCellProps) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = options.filter(o => value.includes(o.id))
 
   return (
-    <div className="relative">
+    <div>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="flex flex-wrap gap-1 px-1 py-0.5 rounded hover:bg-white/[0.05] min-h-[28px]"
@@ -35,35 +38,35 @@ export function TagsCell({ value, options, onChange }: TagsCellProps) {
           ))
         )}
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-50 glass-dark rounded-lg p-1.5 min-w-[160px] shadow-xl border border-white/10">
-            {options.map(opt => {
-              const isSelected = value.includes(opt.id)
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => {
-                    const next = isSelected
-                      ? value.filter(id => id !== opt.id)
-                      : [...value, opt.id]
-                    onChange(next)
-                  }}
-                  className={cn(
-                    'w-full text-left px-2.5 py-1.5 rounded-md text-xs font-body text-white mb-0.5 last:mb-0',
-                    isSelected && 'ring-2 ring-white/30'
-                  )}
-                  style={{ backgroundColor: opt.color }}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+      <CellPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+      >
+        {options.map(opt => {
+          const isSelected = value.includes(opt.id)
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                const next = isSelected
+                  ? value.filter(id => id !== opt.id)
+                  : [...value, opt.id]
+                onChange(next)
+              }}
+              className={cn(
+                cellPopoverOptionClass,
+                'text-white',
+                isSelected && 'ring-2 ring-white/30'
+              )}
+              style={{ backgroundColor: opt.color }}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </CellPopover>
     </div>
   )
 }

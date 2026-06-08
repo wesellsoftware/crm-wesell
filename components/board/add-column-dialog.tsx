@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import {
   Dialog,
@@ -24,6 +25,7 @@ interface AddColumnDialogProps {
 }
 
 export function AddColumnDialog({ boardId, slug }: AddColumnDialogProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [type, setType] = useState<ColumnType>('text')
@@ -39,9 +41,12 @@ export function AddColumnDialog({ boardId, slug }: AddColumnDialogProps) {
           : type === 'currency'
             ? { currency: 'BRL' }
             : {}
-      await createColumn(boardId, name.trim(), type, slug, settings)
-      setName('')
-      setOpen(false)
+      const result = await createColumn(boardId, name.trim(), type, slug, settings)
+      if (!result.error) {
+        setName('')
+        setOpen(false)
+        router.refresh()
+      }
     })
   }
 

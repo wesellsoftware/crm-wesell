@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getBoardBySlug } from '@/lib/boards/queries'
 import { BoardPageClient } from '@/components/board/board-page'
 import { BOARD_SLUGS } from '@/lib/boards/templates'
+import { PageTitle } from '@/components/page-title'
 import { getOrgContext } from '@/lib/boards/org-context'
 
 export default async function BoardPage({
@@ -17,13 +18,14 @@ export default async function BoardPage({
 
   const data = await getBoardBySlug(slug)
 
+  const ctx = await getOrgContext()
+
   if (!data) {
-    const ctx = await getOrgContext()
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-        <h1 className="font-display text-2xl text-we-paper mb-2">
+        <PageTitle className="mb-2">
           {ctx ? 'Board não encontrado' : 'Sessão expirada'}
-        </h1>
+        </PageTitle>
         <p className="font-body text-we-paper/50 text-sm max-w-md">
           {ctx
             ? `Não foi possível carregar o board "${slug}". Tente recarregar a página.`
@@ -33,5 +35,5 @@ export default async function BoardPage({
     )
   }
 
-  return <BoardPageClient data={data} />
+  return <BoardPageClient data={data} currentUserId={ctx?.user.id ?? null} />
 }

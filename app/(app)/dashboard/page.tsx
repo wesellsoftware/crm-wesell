@@ -1,8 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { getDashboardBoardStats } from '@/lib/boards/queries'
+import { getDashboardBoardStats, getNegociacoesAnalytics } from '@/lib/boards/queries'
 import { DealsByStageChart } from '@/components/dashboard/deals-by-stage-chart'
-import { formatCurrency } from '@/lib/utils'
-import { Calendar, TrendingUp, Target, Activity } from 'lucide-react'
+import { PipelineKpis } from '@/components/dashboard/pipeline-kpis'
+import { SalesKpis } from '@/components/dashboard/sales-kpis'
+import { RevenueByProductChart } from '@/components/relatorios/revenue-by-product-chart'
+import { TopSellersRanking } from '@/components/relatorios/top-sellers-ranking'
+import { PageTitle } from '@/components/page-title'
+export const dynamic = 'force-dynamic'
 
 function activityTypeLabel(type: string) {
   const map: Record<string, string> = {
@@ -22,7 +26,10 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const boardStats = await getDashboardBoardStats()
+  const [boardStats, analytics] = await Promise.all([
+    getDashboardBoardStats(),
+    getNegociacoesAnalytics(),
+  ])
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -42,44 +49,54 @@ export default async function DashboardPage() {
   const wonCount = boardStats?.wonCount ?? 0
   const conversionRate = boardStats?.conversionRate ?? 0
   const chartData = boardStats?.chartData ?? []
+  const revenueByProduct = analytics?.revenueByProduct ?? []
+  const topSellers = analytics?.topSellers ?? []
 
   const greeting = getGreeting()
   const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 
-  const kpis = [
-    { label: 'Oportunidades ativas', value: openCount.toString(), icon: Target, color: '#4342F5' },
-    { label: 'Valor em pipeline', value: formatCurrency(pipelineValue), icon: TrendingUp, color: '#45F47F' },
-    { label: 'Fechados/Ganhos', value: wonCount.toString(), icon: Calendar, color: '#D7FE65' },
-    { label: 'Taxa de conversão', value: `${conversionRate}%`, icon: Activity, color: '#7845F4' },
-  ]
-
   return (
     <div className="p-8 space-y-7">
       <div>
-        <h1 className="font-display text-4xl text-we-paper">
+        <PageTitle>
           {greeting}, {firstName}.
-        </h1>
+        </PageTitle>
         <p className="font-body text-we-paper/45 mt-1 text-sm">
           {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {kpis.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="glass rounded-xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="font-body text-xs text-we-paper/45 uppercase tracking-wide">{label}</p>
-              <div
-                className="size-7 rounded-lg flex items-center justify-center"
-                style={{ background: `${color}22` }}
-              >
-                <Icon size={14} style={{ color }} />
-              </div>
+      {analytics && (
+        <section className="space-y-3">
+          <p className="font-body text-sm font-semibold text-we-paper/70">Indicadores de negociações</p>
+          <SalesKpis analytics={analytics} />
+        </section>
+      )}
+
+      <section className="glass rounded-xl p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <p className="font-body text-sm font-semibold text-we-paper/70">Receita por produto</p>
+            <div className="min-h-[240px]">
+              <RevenueByProductChart data={revenueByProduct} />
             </div>
-            <p className="font-body text-3xl text-we-paper leading-none">{value}</p>
           </div>
-        ))}
-      </div>
+          <div className="space-y-4">
+            <p className="font-body text-sm font-semibold text-we-paper/70">Top vendedores</p>
+            <TopSellersRanking data={topSellers} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="font-body text-sm font-semibold text-we-paper/70">Pipeline</p>
+        <PipelineKpis
+          openCount={openCount}
+          pipelineValue={pipelineValue}
+          wonCount={wonCount}
+          conversionRate={conversionRate}
+        />
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 glass rounded-xl p-6 flex flex-col gap-3 min-h-[280px]">

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Users,
   DollarSign,
@@ -32,8 +32,19 @@ type AppSidebarProps = {
   fullName: string
 }
 
+const DASHBOARD_HREF = "/dashboard"
+
 export function AppSidebar({ avatarUrl, fullName }: AppSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  function handleDashboardNav(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    if (pathname !== DASHBOARD_HREF) {
+      router.push(DASHBOARD_HREF)
+    }
+    router.refresh()
+  }
 
   return (
     <aside className="glass-dark relative flex flex-col w-56 shrink-0 border-r-0">
@@ -56,6 +67,7 @@ export function AppSidebar({ avatarUrl, fullName }: AppSidebarProps) {
             <Link
               key={href}
               href={href}
+              onClick={href === DASHBOARD_HREF ? handleDashboardNav : undefined}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-[8px] text-sm font-body transition-colors",
                 active

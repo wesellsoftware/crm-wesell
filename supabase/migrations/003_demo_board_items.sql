@@ -146,6 +146,11 @@ BEGIN
     (v_deal1, v_col_id, '{"option_id":"d4000001-0000-4000-8000-000000000001"}'),
     (v_deal2, v_col_id, '{"option_id":"d4000001-0000-4000-8000-000000000002"}');
 
+  SELECT id INTO v_col_id FROM board_columns WHERE board_id = v_board_id AND name = 'Produto';
+  INSERT INTO board_item_values (item_id, column_id, value) VALUES
+    (v_deal1, v_col_id, '{"option_ids":["f6000001-0000-4000-8000-000000000001","f6000001-0000-4000-8000-000000000003"]}'),
+    (v_deal2, v_col_id, '{"option_ids":["f6000001-0000-4000-8000-000000000002"]}');
+
   SELECT id INTO v_col_id FROM board_columns WHERE board_id = v_board_id AND name = 'Valor da negociação';
   INSERT INTO board_item_values (item_id, column_id, value) VALUES
     (v_deal1, v_col_id, '{"amount":70000,"currency":"BRL"}'),
@@ -169,11 +174,16 @@ BEGIN
 
   -- Closed deal
   SELECT id INTO v_group_id FROM board_groups WHERE board_id = v_board_id AND name = 'Fechado/Ganho';
-  INSERT INTO board_items (board_id, group_id, name, position) VALUES (v_board_id, v_group_id, 'Negociação Amazon', 0) RETURNING id INTO v_item_id;
+  INSERT INTO board_items (board_id, group_id, name, position, closed_at) VALUES
+    (v_board_id, v_group_id, 'Negociação Amazon', 0, now() - interval '18 days') RETURNING id INTO v_item_id;
 
   SELECT id INTO v_col_id FROM board_columns WHERE board_id = v_board_id AND name = 'Etapa';
   INSERT INTO board_item_values (item_id, column_id, value) VALUES
     (v_item_id, v_col_id, '{"option_id":"d4000001-0000-4000-8000-000000000004"}');
+
+  SELECT id INTO v_col_id FROM board_columns WHERE board_id = v_board_id AND name = 'Produto';
+  INSERT INTO board_item_values (item_id, column_id, value) VALUES
+    (v_item_id, v_col_id, '{"option_ids":["f6000001-0000-4000-8000-000000000001","f6000001-0000-4000-8000-000000000004"]}');
 
   SELECT id INTO v_col_id FROM board_columns WHERE board_id = v_board_id AND name = 'Valor da negociação';
   INSERT INTO board_item_values (item_id, column_id, value) VALUES

@@ -15,6 +15,8 @@ import { PhoneCell } from './phone-cell'
 import { UrlCell } from './url-cell'
 import { TagsCell } from './tags-cell'
 import { RelationCell } from './relation-cell'
+import { fireConfettiSideCannons } from '@/lib/confetti-side-cannons'
+import { isWonGroupName } from '@/lib/boards/won-group'
 
 interface CellRendererProps {
   column: BoardColumn
@@ -55,14 +57,36 @@ export function CellRenderer({
           onChange={v => handleChange({ text: v })}
         />
       )
-    case 'status':
+    case 'status': {
+      const currentOptionId = (value as { option_id?: string })?.option_id
+      const isEtapaColumn = column.name === 'Etapa' && slug === 'negociacoes'
       return (
         <StatusCell
-          value={(value as { option_id?: string })?.option_id}
+          value={currentOptionId}
           options={settings.options ?? []}
-          onChange={optionId => handleChange({ option_id: optionId })}
+          onChange={optionId => {
+            const option = (settings.options ?? []).find(o => o.id === optionId)
+            if (
+              option &&
+              isWonGroupName(option.label) &&
+              currentOptionId !== optionId
+            ) {
+              fireConfettiSideCannons()
+            }
+            onUpdate(itemId, column.id, { option_id: optionId })
+            startTransition(async () => {
+              if (isEtapaColumn) {
+                const { updateDealEtapa } = await import('@/app/actions/boards')
+                await updateDealEtapa(itemId, optionId, slug)
+              } else {
+                const { upsertItemValue } = await import('@/app/actions/boards')
+                await upsertItemValue(itemId, column.id, { option_id: optionId }, slug)
+              }
+            })
+          }}
         />
       )
+    }
     case 'person':
       return (
         <PersonCell

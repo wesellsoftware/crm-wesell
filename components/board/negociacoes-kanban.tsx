@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
 import {
   DndContext,
@@ -14,13 +14,50 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { formatCurrency } from '@/lib/utils'
-import { moveDealStage } from '@/app/actions/boards'
-import type { BoardItem, BoardItemValue, StatusOption } from '@/lib/boards/types'
+import { moveItemToGroup } from '@/app/actions/boards'
+import { fireConfettiSideCannons } from '@/lib/confetti-side-cannons'
+import { isWonGroupName } from '@/lib/boards/won-group'
+import type {
+  BoardColumn,
+  BoardGroup,
+  BoardItem,
+  BoardItemValue,
+  OrgMember,
+  RelatedItem,
+} from '@/lib/boards/types'
+import { AvatarGroup } from '@/components/ui/avatar'
+import { PageTitle } from '@/components/page-title'
+import { MemberAvatar } from './cells/member-avatar'
+import { BoardItemDrawer } from './board-item-drawer'
 
-function KanbanDealCard({ item, value, contactName }: {
+function getResponsibleMembers(
+  itemId: string,
+  values: BoardItemValue[],
+  personColumnId: string | undefined,
+  members: OrgMember[]
+): OrgMember[] {
+  if (!personColumnId) return []
+  const personVal = values.find(
+    v => v.item_id === itemId && v.column_id === personColumnId
+  )?.value as { user_ids?: string[] } | undefined
+  const ids = personVal?.user_ids ?? []
+  return members.filter(m => ids.includes(m.id))
+}
+
+function KanbanDealCard({
+  item,
+  value,
+  contactName,
+  responsibleMembers,
+  onOpen,
+  suppressClick,
+}: {
   item: BoardItem
   value?: number
   contactName?: string
+  responsibleMembers: OrgMember[]
+  onOpen: (item: BoardItem) => void
+  suppressClick?: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
 
@@ -29,31 +66,52 @@ function KanbanDealCard({ item, value, contactName }: {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`glass rounded-lg p-3 space-y-2 cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`}
+      onClick={() => {
+        if (!isDragging && !suppressClick) onOpen(item)
+      }}
+      className={`glass rounded-lg p-3 space-y-2 cursor-grab active:cursor-grabbing hover:bg-white/[0.06] transition-colors ${isDragging ? 'opacity-40' : ''}`}
     >
       <p className="font-body text-sm text-we-paper/90 font-medium">{item.name}</p>
       {contactName && <p className="font-body text-xs text-we-paper/45">{contactName}</p>}
+      {responsibleMembers.length > 0 && (
+        <AvatarGroup className="*:data-[slot=avatar]:ring-[#2F2935]">
+          {responsibleMembers.map(m => (
+            <MemberAvatar
+              key={m.id}
+              member={m}
+              size="sm"
+              title={m.full_name ?? ''}
+            />
+          ))}
+        </AvatarGroup>
+      )}
       {value ? <p className="font-mono text-xs text-we-green">{formatCurrency(value)}</p> : null}
     </div>
   )
 }
 
-function KanbanStageColumn({
-  stage,
+function KanbanGroupColumn({
+  group,
   items,
   values,
   valueColumnId,
   contactColumnId,
+  personColumnId,
+  members,
   relatedNames,
+  onOpenDeal,
 }: {
-  stage: StatusOption
+  group: BoardGroup
   items: BoardItem[]
   values: BoardItemValue[]
   valueColumnId?: string
   contactColumnId?: string
+  personColumnId?: string
+  members: OrgMember[]
   relatedNames: Record<string, string>
+  onOpenDeal: (item: BoardItem) => void
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.id })
+  const { setNodeRef, isOver } = useDroppable({ id: group.id })
 
   function getVal(itemId: string, colId?: string) {
     if (!colId) return undefined
@@ -69,8 +127,13 @@ function KanbanStageColumn({
     <div className="w-72 shrink-0 flex flex-col">
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <div className="size-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-          <span className="font-body text-sm font-semibold text-we-paper/80">{stage.label}</span>
+          <div className="size-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+          <span
+            className="font-body text-sm font-semibold"
+            style={{ color: group.color }}
+          >
+            {group.name}
+          </span>
           <span className="font-mono text-xs text-we-paper/35 bg-white/[0.07] rounded-full px-2 py-0.5">
             {items.length}
           </span>
@@ -89,12 +152,20 @@ function KanbanStageColumn({
           const val = getVal(item.id, valueColumnId) as { amount?: number } | undefined
           const contactVal = getVal(item.id, contactColumnId) as { item_ids?: string[] } | undefined
           const contactId = contactVal?.item_ids?.[0]
+          const responsibleMembers = getResponsibleMembers(
+            item.id,
+            values,
+            personColumnId,
+            members
+          )
           return (
             <KanbanDealCard
               key={item.id}
               item={item}
               value={val?.amount}
               contactName={contactId ? relatedNames[contactId] : undefined}
+              responsibleMembers={responsibleMembers}
+              onOpen={onOpenDeal}
             />
           )
         })}
@@ -109,25 +180,43 @@ function KanbanStageColumn({
 }
 
 interface NegociacoesKanbanProps {
-  stages: StatusOption[]
-  itemsByStage: Record<string, BoardItem[]>
+  groups: BoardGroup[]
+  itemsByGroup: Record<string, BoardItem[]>
   values: BoardItemValue[]
+  columns: BoardColumn[]
+  members: OrgMember[]
+  relatedItems: RelatedItem[]
   valueColumnId?: string
   contactColumnId?: string
+  personColumnId?: string
   relatedNames: Record<string, string>
+  currentUserId?: string | null
 }
 
 export function NegociacoesKanban({
-  stages,
-  itemsByStage,
+  groups,
+  itemsByGroup,
   values,
+  columns,
+  members,
+  relatedItems,
   valueColumnId,
   contactColumnId,
+  personColumnId,
   relatedNames,
+  currentUserId,
 }: NegociacoesKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedItem, setSelectedItem] = useState<BoardItem | null>(null)
   const [, startTransition] = useTransition()
-  const [localItemsByStage, setLocalItemsByStage] = useState(itemsByStage)
+  const [localItemsByGroup, setLocalItemsByGroup] = useState(itemsByGroup)
+  const [localGroups, setLocalGroups] = useState(groups)
+  const didDragRef = useRef(false)
+
+  useEffect(() => {
+    setLocalGroups(groups)
+    setLocalItemsByGroup(itemsByGroup)
+  }, [groups, itemsByGroup])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -139,31 +228,43 @@ export function NegociacoesKanban({
     if (!over) return
 
     const itemId = active.id as string
-    const stageId = over.id as string
+    const groupId = over.id as string
 
-    setLocalItemsByStage(prev => {
+    if (!localGroups.some(g => g.id === groupId)) return
+
+    const targetGroup = localGroups.find(g => g.id === groupId)
+    const item = Object.values(itemsByGroup).flat().find(i => i.id === itemId)
+    const wasInWon = item
+      ? localGroups.some(g => g.id === item.group_id && isWonGroupName(g.name))
+      : false
+
+    if (targetGroup && isWonGroupName(targetGroup.name) && !wasInWon) {
+      fireConfettiSideCannons()
+    }
+
+    setLocalItemsByGroup(prev => {
       const next: Record<string, BoardItem[]> = {}
       for (const key of Object.keys(prev)) {
         next[key] = prev[key].filter(i => i.id !== itemId)
       }
-      const item = Object.values(itemsByStage).flat().find(i => i.id === itemId)
+      const item = Object.values(itemsByGroup).flat().find(i => i.id === itemId)
       if (item) {
-        next[stageId] = [...(next[stageId] ?? []), item]
+        next[groupId] = [...(next[groupId] ?? []), { ...item, group_id: groupId }]
       }
       return next
     })
 
-    startTransition(() => { void moveDealStage(itemId, stageId) })
+    startTransition(() => { void moveItemToGroup(itemId, groupId, 'negociacoes') })
   }
 
   const activeItem = activeId
-    ? Object.values(localItemsByStage).flat().find(i => i.id === activeId)
+    ? Object.values(localItemsByGroup).flat().find(i => i.id === activeId)
     : null
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-8 pt-6 pb-2 shrink-0">
-        <h1 className="font-display text-3xl text-we-paper">Negociações</h1>
+        <PageTitle>Negociações</PageTitle>
         <div className="flex items-center gap-4 mt-2 border-b border-white/[0.06]">
           <Link
             href="/boards/negociacoes"
@@ -177,30 +278,78 @@ export function NegociacoesKanban({
         </div>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        onDragStart={(e: DragStartEvent) => setActiveId(e.active.id as string)}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex-1 overflow-x-auto px-8 py-6">
-          <div className="flex gap-4 h-full min-w-max">
-            {stages.map(stage => (
-              <KanbanStageColumn
-                key={stage.id}
-                stage={stage}
-                items={localItemsByStage[stage.id] ?? []}
-                values={values}
-                valueColumnId={valueColumnId}
-                contactColumnId={contactColumnId}
-                relatedNames={relatedNames}
-              />
-            ))}
-          </div>
+      {localGroups.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center px-8">
+          <p className="font-body text-sm text-we-paper/40 text-center max-w-sm">
+            Nenhum grupo no quadro principal. Crie grupos em{' '}
+            <Link href="/boards/negociacoes" className="text-we-blue hover:underline">
+              Quadro principal
+            </Link>{' '}
+            para exibir colunas aqui.
+          </p>
         </div>
-        <DragOverlay>
-          {activeItem && <KanbanDealCard item={activeItem} />}
-        </DragOverlay>
-      </DndContext>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={(e: DragStartEvent) => {
+            didDragRef.current = true
+            setActiveId(e.active.id as string)
+          }}
+          onDragEnd={event => {
+            handleDragEnd(event)
+            setTimeout(() => { didDragRef.current = false }, 0)
+          }}
+        >
+          <div className="flex-1 overflow-x-auto px-8 py-6">
+            <div className="flex gap-4 h-full min-w-max">
+              {localGroups.map(group => (
+                <KanbanGroupColumn
+                  key={group.id}
+                  group={group}
+                  items={localItemsByGroup[group.id] ?? []}
+                  values={values}
+                  valueColumnId={valueColumnId}
+                  contactColumnId={contactColumnId}
+                  personColumnId={personColumnId}
+                  members={members}
+                  relatedNames={relatedNames}
+                  onOpenDeal={item => {
+                    if (!didDragRef.current) setSelectedItem(item)
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+          <DragOverlay>
+            {activeItem && (
+              <KanbanDealCard
+                item={activeItem}
+                responsibleMembers={getResponsibleMembers(
+                  activeItem.id,
+                  values,
+                  personColumnId,
+                  members
+                )}
+                onOpen={() => {}}
+                suppressClick
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
+
+      <BoardItemDrawer
+        item={selectedItem}
+        slug="negociacoes"
+        columns={columns}
+        values={values}
+        members={members}
+        relatedItems={relatedItems}
+        groups={localGroups}
+        currentUserId={currentUserId}
+        open={selectedItem !== null}
+        onOpenChange={open => { if (!open) setSelectedItem(null) }}
+      />
     </div>
   )
 }

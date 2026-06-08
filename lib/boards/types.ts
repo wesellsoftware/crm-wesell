@@ -64,6 +64,7 @@ export interface BoardItem {
   created_by: string | null
   created_at: string
   updated_at: string
+  closed_at: string | null
 }
 
 export type CellValue =
@@ -88,6 +89,7 @@ export interface BoardItemValue {
 export interface OrgMember {
   id: string
   full_name: string | null
+  avatar_url: string | null
 }
 
 export interface RelatedItem {
@@ -126,4 +128,22 @@ export interface BoardTemplate {
   position: number
   groups: BoardTemplateGroup[]
   columns: BoardTemplateColumn[]
+}
+
+export type BoardItemActivityType =
+  | 'created'
+  | 'comment'
+  | 'name_change'
+  | 'group_change'
+  | 'field_update'
+
+export interface BoardItemActivity {
+  id: string
+  item_id: string
+  user_id: string | null
+  type: BoardItemActivityType
+  body: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  user?: OrgMember | null
 }

@@ -3,6 +3,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const breeSerif = "'Bree Serif', Georgia, serif"
+const CHART_FONT_SIZE = 16
 
 export type StageChartData = {
   name: string
@@ -17,7 +18,7 @@ export function DealsByStageChart({ data }: { data: StageChartData[] }) {
   if (!hasData) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="font-mono text-xs text-we-paper/25">Nenhum negócio aberto ainda</p>
+        <p className="font-mono text-base text-we-paper/25">Nenhum negócio aberto ainda</p>
       </div>
     )
   }
@@ -27,13 +28,13 @@ export function DealsByStageChart({ data }: { data: StageChartData[] }) {
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
         <XAxis
           dataKey="name"
-          tick={{ fill: 'rgba(237,237,235,0.45)', fontSize: 11, fontFamily: breeSerif }}
+          tick={{ fill: 'rgba(237,237,235,0.45)', fontSize: CHART_FONT_SIZE, fontFamily: breeSerif }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           allowDecimals={false}
-          tick={{ fill: 'rgba(237,237,235,0.35)', fontSize: 11, fontFamily: breeSerif }}
+          tick={{ fill: 'rgba(237,237,235,0.35)', fontSize: CHART_FONT_SIZE, fontFamily: breeSerif }}
           axisLine={false}
           tickLine={false}
         />
@@ -43,11 +44,11 @@ export function DealsByStageChart({ data }: { data: StageChartData[] }) {
             background: 'rgba(26,22,38,0.95)',
             border: '1px solid rgba(255,255,255,0.10)',
             borderRadius: 8,
-            fontSize: 12,
+            fontSize: CHART_FONT_SIZE,
             fontFamily: breeSerif,
           }}
-          labelStyle={{ color: '#EDEDEB', marginBottom: 4 }}
-          itemStyle={{ color: 'rgba(237,237,235,0.70)' }}
+          labelStyle={{ color: '#EDEDEB', marginBottom: 4, fontSize: CHART_FONT_SIZE }}
+          itemStyle={{ color: 'rgba(237,237,235,0.70)', fontSize: CHART_FONT_SIZE }}
           formatter={(val, name) => {
             const n = Number(val)
             if (name === 'count') return [`${n} negócio${n !== 1 ? 's' : ''}`, ''] as [string, string]

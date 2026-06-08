@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ActivityToggle } from '@/components/atividades/activity-toggle'
 import { NewActivityDialog } from '@/components/atividades/new-activity-dialog'
+import { PageTitle } from '@/components/page-title'
 import { Calendar, CheckCircle2 } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -45,7 +46,7 @@ export default async function AtividadesPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl text-we-paper">Atividades</h1>
+          <PageTitle>Atividades</PageTitle>
           <p className="font-body text-we-paper/45 text-sm mt-0.5">
             {pendingCount} pendente{pendingCount !== 1 ? 's' : ''}
           </p>

@@ -1,8 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { OrgMember } from '@/lib/boards/types'
+import { AvatarGroup } from '@/components/ui/avatar'
+import { CellPopover, cellPopoverOptionClass } from './cell-popover'
+import { MemberAvatar } from './member-avatar'
 
 interface PersonCellProps {
   value: string[]
@@ -12,64 +16,76 @@ interface PersonCellProps {
 
 export function PersonCell({ value, members, onChange }: PersonCellProps) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = members.filter(m => value.includes(m.id))
 
   return (
-    <div className="relative">
+    <div className="flex items-center gap-1 flex-wrap min-h-[28px]">
+      {selected.length > 0 && (
+        <AvatarGroup className="*:data-[slot=avatar]:ring-we-ink/80">
+          {selected.map(m => (
+            <MemberAvatar
+              key={m.id}
+              member={m}
+              size="sm"
+              title={m.full_name ?? ''}
+            />
+          ))}
+        </AvatarGroup>
+      )}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-white/[0.05] min-h-[28px]"
+        className={cn(
+          'flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/[0.05] transition-colors',
+          selected.length === 0 ? 'text-we-paper/25' : 'text-we-paper/40'
+        )}
+        title={selected.length === 0 ? 'Adicionar responsável' : 'Adicionar outro responsável'}
       >
         {selected.length === 0 ? (
-          <span className="text-we-paper/25 text-xs">+</span>
+          <span className="text-xs">+</span>
         ) : (
-          selected.map(m => (
-            <div
-              key={m.id}
-              className="size-6 rounded-full bg-we-blue/30 flex items-center justify-center shrink-0"
-              title={m.full_name ?? ''}
-            >
-              <span className="text-[10px] font-semibold text-we-blue">
-                {(m.full_name ?? '?').charAt(0).toUpperCase()}
-              </span>
-            </div>
-          ))
+          <Plus size={12} />
         )}
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-50 glass-dark rounded-lg p-1.5 min-w-[180px] shadow-xl border border-white/10">
-            {members.map(m => {
-              const isSelected = value.includes(m.id)
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    const next = isSelected
-                      ? value.filter(id => id !== m.id)
-                      : [...value, m.id]
-                    onChange(next)
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-body transition-colors',
-                    isSelected ? 'bg-we-blue/20 text-we-paper' : 'text-we-paper/60 hover:bg-white/[0.05]'
-                  )}
-                >
-                  <div className="size-5 rounded-full bg-we-blue/30 flex items-center justify-center">
-                    <span className="text-[9px] font-semibold text-we-blue">
-                      {(m.full_name ?? '?').charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  {m.full_name ?? 'Sem nome'}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+      <CellPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        maxHeight={220}
+        className="glass-scrollbar"
+      >
+        {members.map(m => {
+          const isSelected = value.includes(m.id)
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                const next = isSelected
+                  ? value.filter(id => id !== m.id)
+                  : [...value, m.id]
+                onChange(next)
+              }}
+              className={cn(
+                cellPopoverOptionClass,
+                'flex items-center gap-2 transition-colors',
+                isSelected ? 'bg-we-blue/20 text-we-paper' : 'text-we-paper/60 hover:bg-white/[0.05]'
+              )}
+            >
+              <MemberAvatar member={m} size="sm" />
+              <span>{m.full_name ?? 'Sem nome'}</span>
+              {isSelected && (
+                <span className="text-[10px] text-we-blue shrink-0">✓</span>
+              )}
+            </button>
+          )
+        })}
+        {members.length === 0 && (
+          <p className="px-2.5 py-1.5 text-xs text-we-paper/30 font-body">Nenhum membro</p>
+        )}
+      </CellPopover>
     </div>
   )
 }

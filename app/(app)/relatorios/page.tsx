@@ -1,9 +1,16 @@
-import { getDashboardBoardStats } from '@/lib/boards/queries'
+import { getDashboardBoardStats, getNegociacoesAnalytics } from '@/lib/boards/queries'
 import { DealsTrendChart, PipelineValueChart } from '@/components/relatorios/deals-trend-chart'
+import { NegociacoesKpis } from '@/components/relatorios/negociacoes-kpis'
+import { RevenueByProductChart, RevenueByProductTable } from '@/components/relatorios/revenue-by-product-chart'
+import { TopSellersRanking } from '@/components/relatorios/top-sellers-ranking'
+import { PageTitle } from '@/components/page-title'
 import { formatCurrency } from '@/lib/utils'
 
 export default async function RelatoriosPage() {
-  const boardStats = await getDashboardBoardStats()
+  const [boardStats, analytics] = await Promise.all([
+    getDashboardBoardStats(),
+    getNegociacoesAnalytics(),
+  ])
 
   const pipelineByStage = (boardStats?.chartData ?? []).map(s => ({
     name: s.name,
@@ -16,7 +23,6 @@ export default async function RelatoriosPage() {
   const pipelineValue = boardStats?.pipelineValue ?? 0
   const wonCount = boardStats?.wonCount ?? 0
   const conversionRate = boardStats?.conversionRate ?? 0
-  const avgDeal = wonCount > 0 ? pipelineValue / Math.max(openCount, 1) : 0
 
   const trend = [{
     month: 'Atual',
@@ -25,12 +31,17 @@ export default async function RelatoriosPage() {
     value: pipelineValue,
   }]
 
+  const revenueByProduct = analytics?.revenueByProduct ?? []
+  const topSellers = analytics?.topSellers ?? []
+
   return (
     <div className="p-8 space-y-7">
       <div>
-        <h1 className="font-display text-3xl text-we-paper">Relatórios</h1>
+        <PageTitle>Relatórios</PageTitle>
         <p className="font-body text-we-paper/45 text-sm mt-0.5">Painel de negociações</p>
       </div>
+
+      {analytics && <NegociacoesKpis analytics={analytics} />}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
@@ -44,6 +55,22 @@ export default async function RelatoriosPage() {
             <p className="font-display text-3xl text-we-paper">{value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="glass rounded-xl p-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <p className="font-body text-sm font-semibold text-we-paper/70">Receita por produto</p>
+            <div className="min-h-[240px]">
+              <RevenueByProductChart data={revenueByProduct} />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <p className="font-body text-sm font-semibold text-we-paper/70">Top vendedores</p>
+            <TopSellersRanking data={topSellers} />
+          </div>
+        </div>
+        <RevenueByProductTable data={revenueByProduct} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

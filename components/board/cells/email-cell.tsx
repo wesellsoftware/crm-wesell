@@ -20,7 +20,7 @@ export function EmailCell({ value, onChange }: EmailCellProps) {
         onChange={e => setDraft(e.target.value)}
         onBlur={() => { setEditing(false); if (draft !== value) onChange(draft) }}
         onKeyDown={e => e.key === 'Enter' && (setEditing(false), onChange(draft))}
-        className="w-full glass-input rounded px-2 py-1 outline-none font-mono text-xs text-we-blue"
+        className="w-full glass-input rounded px-2 py-1 outline-none font-mono text-xs text-we-paper"
       />
     )
   }
@@ -30,7 +30,7 @@ export function EmailCell({ value, onChange }: EmailCellProps) {
       <a
         href={`mailto:${value}`}
         onClick={e => e.stopPropagation()}
-        className="font-mono text-xs text-we-blue hover:underline px-1"
+        className="font-mono text-xs text-we-paper hover:underline px-1"
       >
         {value}
       </a>

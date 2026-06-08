@@ -12,22 +12,24 @@ export type MonthlyData = {
   value: number
 }
 
+const CHART_FONT_SIZE = 16
+
 const tooltipStyle = {
   contentStyle: {
     background: 'rgba(26,22,38,0.95)',
     border: '1px solid rgba(255,255,255,0.10)',
     borderRadius: 8,
-    fontSize: 12,
+    fontSize: CHART_FONT_SIZE,
     fontFamily: 'inherit',
   },
-  labelStyle: { color: '#EDEDEB', marginBottom: 4 },
-  itemStyle: { color: 'rgba(237,237,235,0.70)' },
+  labelStyle: { color: '#EDEDEB', marginBottom: 4, fontSize: CHART_FONT_SIZE },
+  itemStyle: { color: 'rgba(237,237,235,0.70)', fontSize: CHART_FONT_SIZE },
 }
 
 const axisProps = {
   axisLine: false as const,
   tickLine: false as const,
-  tick: { fill: 'rgba(237,237,235,0.35)', fontSize: 11, fontFamily: 'inherit' },
+  tick: { fill: 'rgba(237,237,235,0.35)', fontSize: CHART_FONT_SIZE, fontFamily: 'inherit' },
 }
 
 export function DealsTrendChart({ data }: { data: MonthlyData[] }) {
@@ -39,7 +41,7 @@ export function DealsTrendChart({ data }: { data: MonthlyData[] }) {
         <XAxis dataKey="month" {...axisProps} />
         <YAxis allowDecimals={false} {...axisProps} />
         <Tooltip {...tooltipStyle} />
-        <Legend wrapperStyle={{ fontSize: 11, color: 'rgba(237,237,235,0.45)' }} />
+        <Legend wrapperStyle={{ fontSize: CHART_FONT_SIZE, color: 'rgba(237,237,235,0.45)' }} />
         <Bar dataKey="won" name="Ganhos" fill="#45F47F" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
         <Bar dataKey="lost" name="Perdidos" fill="#F44545" fillOpacity={0.60} radius={[3, 3, 0, 0]} />
       </BarChart>
@@ -58,7 +60,7 @@ export function PipelineValueChart({ data }: { data: StageValueData[] }) {
         <XAxis type="number" {...axisProps}
           tickFormatter={v => new Intl.NumberFormat('pt-BR', { notation: 'compact', currency: 'BRL' }).format(v)}
         />
-        <YAxis type="category" dataKey="name" {...axisProps} width={90} />
+        <YAxis type="category" dataKey="name" {...axisProps} width={120} />
         <Tooltip
           {...tooltipStyle}
           formatter={(v) => [
@@ -79,7 +81,7 @@ export function PipelineValueChart({ data }: { data: StageValueData[] }) {
 function EmptyChart() {
   return (
     <div className="flex-1 flex items-center justify-center h-full">
-      <p className="font-mono text-xs text-we-paper/25">Sem dados suficientes</p>
+      <p className="font-mono text-base text-we-paper/25">Sem dados suficientes</p>
     </div>
   )
 }

@@ -36,6 +36,13 @@ const SECTOR_TAGS = [
   createStatusOption('Saúde', '#F4A545'),
 ]
 
+const PRODUCT_TAGS = [
+  createStatusOption('CRM', '#4342F5', 'f6000001-0000-4000-8000-000000000001'),
+  createStatusOption('Automação', '#45D4F4', 'f6000001-0000-4000-8000-000000000002'),
+  createStatusOption('Consultoria', '#45F47F', 'f6000001-0000-4000-8000-000000000003'),
+  createStatusOption('Suporte', '#F4A545', 'f6000001-0000-4000-8000-000000000004'),
+]
+
 export const BOARD_TEMPLATES: BoardTemplate[] = [
   {
     slug: 'contatos',
@@ -62,9 +69,11 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     groups: [
       { name: 'Oportunidades ativas', color: '#4342F5' },
       { name: 'Fechado/Ganho', color: '#45F47F' },
+      { name: 'Perdidos', color: '#F44545' },
     ],
     columns: [
       { name: 'Oportunidade', type: 'text', is_primary: true },
+      { name: 'Produto', type: 'tags', settings: { options: PRODUCT_TAGS } },
       { name: 'Cronograma', type: 'timeline' },
       { name: 'Etapa', type: 'status', settings: { options: DEAL_STAGE } },
       { name: 'Responsável', type: 'person' },

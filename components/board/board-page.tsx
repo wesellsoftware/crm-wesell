@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { BoardData } from '@/lib/boards/types'
+import type { BoardColumn, BoardData } from '@/lib/boards/types'
+import { PageTitle } from '@/components/page-title'
 import { BoardToolbar } from './board-toolbar'
 import { BoardTable } from './board-table'
 
@@ -15,13 +16,29 @@ const ITEM_LABELS: Record<string, string> = {
 
 interface BoardPageClientProps {
   data: BoardData
+  currentUserId?: string | null
 }
 
-export function BoardPageClient({ data }: BoardPageClientProps) {
+export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [autoAddGroupId, setAutoAddGroupId] = useState<string | null>(null)
-  const { board, groups, columns, items, values, members, relatedItems } = data
+  const [localColumns, setLocalColumns] = useState<BoardColumn[]>(data.columns)
+  const { board, groups, items, values, members, relatedItems } = data
   const itemLabel = ITEM_LABELS[board.slug] ?? 'item'
+
+  useEffect(() => {
+    setLocalColumns(data.columns)
+  }, [data.columns])
+
+  function handleColumnUpdate(columnId: string, updates: Partial<BoardColumn>) {
+    setLocalColumns(prev =>
+      prev.map(col => (col.id === columnId ? { ...col, ...updates } : col))
+    )
+  }
+
+  function handleColumnDelete(columnId: string) {
+    setLocalColumns(prev => prev.filter(col => col.id !== columnId))
+  }
 
   function handleCreateClick() {
     if (groups.length > 0) {
@@ -31,9 +48,9 @@ export function BoardPageClient({ data }: BoardPageClientProps) {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="px-6 pt-5 pb-0 shrink-0 border-b border-white/[0.06]">
-        <h1 className="font-display text-2xl text-we-paper">{board.name}</h1>
-        <div className="flex items-center gap-4 mt-3">
+      <div className="px-8 pt-6 pb-2 shrink-0 border-b border-white/[0.06]">
+        <PageTitle>{board.name}</PageTitle>
+        <div className="flex items-center gap-4 mt-2">
           <span className="font-body text-sm text-we-blue border-b-2 border-we-blue pb-2 font-medium">
             Quadro principal
           </span>
@@ -63,7 +80,7 @@ export function BoardPageClient({ data }: BoardPageClientProps) {
             <p className="font-body text-we-paper/50">Nenhum grupo neste board.</p>
             <p className="font-body text-we-paper/35 text-sm">Recarregue a página para tentar novamente.</p>
           </div>
-        ) : columns.length === 0 ? (
+        ) : localColumns.length === 0 ? (
           <div className="glass rounded-xl p-16 flex flex-col items-center gap-3 text-center">
             <p className="font-body text-we-paper/50">Nenhuma coluna configurada.</p>
           </div>
@@ -72,7 +89,7 @@ export function BoardPageClient({ data }: BoardPageClientProps) {
             boardId={board.id}
             slug={board.slug}
             groups={groups}
-            columns={columns}
+            columns={localColumns}
             items={items}
             values={values}
             members={members}
@@ -80,6 +97,9 @@ export function BoardPageClient({ data }: BoardPageClientProps) {
             searchQuery={searchQuery}
             autoAddGroupId={autoAddGroupId}
             onAutoAddDone={() => setAutoAddGroupId(null)}
+            onColumnUpdate={handleColumnUpdate}
+            onColumnDelete={handleColumnDelete}
+            currentUserId={currentUserId}
           />
         )}
       </div>

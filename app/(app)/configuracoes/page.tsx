@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProfileForm } from '@/components/configuracoes/profile-form'
 import { OrgForm } from '@/components/configuracoes/org-form'
+import { PageTitle } from '@/components/page-title'
 import { StagesManager } from '@/components/configuracoes/stages-manager'
 
 export default async function ConfiguracoesPage() {
@@ -23,7 +24,7 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="p-8 space-y-8 max-w-3xl">
-      <h1 className="font-display text-3xl text-we-paper">Configurações</h1>
+      <PageTitle>Configurações</PageTitle>
 
       {/* Profile */}
       <section className="glass rounded-xl p-6 space-y-5">

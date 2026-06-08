@@ -13,6 +13,7 @@ import {
 import { KanbanColumn } from './kanban-column'
 import { DealCard, DealData } from './deal-card'
 import { NewDealDialog } from './new-deal-dialog'
+import { PageTitle } from '@/components/page-title'
 import { moveDeal } from '@/app/actions/deals'
 
 interface Stage {
@@ -72,7 +73,7 @@ export function KanbanBoard({ stages, deals: initialDeals, contacts }: KanbanBoa
       {/* Header */}
       <div className="px-8 py-6 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="font-display text-3xl text-we-paper">Funil</h1>
+          <PageTitle>Funil</PageTitle>
           <p className="font-body text-we-paper/45 text-sm mt-0.5">
             {openDeals.length} negócio{openDeals.length !== 1 ? 's' : ''} aberto{openDeals.length !== 1 ? 's' : ''}
           </p>
