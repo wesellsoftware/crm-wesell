@@ -1,16 +1,36 @@
+'use client'
+
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+import Image from "next/image"
+import { ArrowRight, MailWarning } from "lucide-react"
+import { useActionState } from "react"
+import { login, resendVerification } from "@/app/actions/auth"
 
 export default function LoginPage() {
+  const [state, action, pending] = useActionState(login, undefined)
+  const [resendState, resendAction, resendPending] = useActionState(resendVerification, undefined)
+
   return (
-    <div className="min-h-screen flex">
+    <div
+      className="min-h-screen flex relative overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #1a1626 0%, #2F2935 45%, #1e1b2e 100%)" }}
+    >
+      {/* Orbs decorativos */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, #4342F5 0%, transparent 70%)" }} />
+        <div className="absolute top-1/2 -right-48 w-[500px] h-[500px] rounded-full opacity-15"
+          style={{ background: "radial-gradient(circle, #7845F4 0%, transparent 70%)" }} />
+        <div className="absolute -bottom-24 left-1/3 w-[400px] h-[400px] rounded-full opacity-10"
+          style={{ background: "radial-gradient(circle, #D7FE65 0%, transparent 70%)" }} />
+      </div>
+
       {/* Painel de marca — visível só em telas largas */}
-      <aside className="hidden lg:flex w-[480px] shrink-0 flex-col justify-between bg-we-ink p-12">
-        <div>
-          <span className="font-display text-3xl text-we-white">We</span>
-          <span className="font-display text-3xl text-we-lime">Sell</span>
-          <span className="font-mono text-sm text-we-paper/40 ml-2 tracking-widest">CRM</span>
-        </div>
+      <aside
+        className="hidden lg:flex w-[480px] shrink-0 flex-col justify-between glass-dark p-12 relative z-10"
+        style={{ background: "rgba(26,22,38,0.70)", borderRight: "1px solid rgba(255,255,255,0.08)" }}
+      >
+        <Image src="/assets/logo-oficial-horizontal.png" alt="WeSell CRM" width={140} height={38} className="h-9 w-auto" priority />
 
         <div className="space-y-8">
           <h1 className="font-display text-5xl leading-[1.1] text-we-white">
@@ -39,13 +59,11 @@ export default function LoginPage() {
       </aside>
 
       {/* Painel do formulário */}
-      <main className="flex flex-1 items-center justify-center bg-we-white px-6 py-12">
-        <div className="w-full max-w-md">
+      <main className="flex flex-1 items-center justify-center px-6 py-12 relative z-10">
+        <div className="w-full max-w-md glass-light rounded-2xl px-10 py-10">
           {/* Logo mobile */}
           <div className="lg:hidden mb-10">
-            <span className="font-display text-3xl text-we-blue">We</span>
-            <span className="font-display text-3xl text-we-ink">Sell</span>
-            <span className="font-mono text-sm text-we-ink/40 ml-2 tracking-widest">CRM</span>
+            <Image src="/assets/logo-oficial-horizontal-preto.png" alt="WeSell CRM" width={130} height={35} className="h-8 w-auto" priority />
           </div>
 
           <div className="mb-8">
@@ -53,7 +71,36 @@ export default function LoginPage() {
             <p className="font-body text-we-ink/55 mt-1">Acesse sua conta WeSell</p>
           </div>
 
-          <form className="space-y-5" action="/login" method="POST">
+          {state?.type === 'unverified' && (
+            <div className="mb-5 px-4 py-3 rounded-[8px] bg-we-yellow/15 border border-we-yellow/40 space-y-2">
+              <div className="flex items-start gap-2">
+                <MailWarning size={16} className="text-we-ink/70 mt-0.5 shrink-0" />
+                <p className="font-body text-sm text-we-ink/80">{state.error}</p>
+              </div>
+              {resendState?.sent ? (
+                <p className="font-body text-xs text-we-ink/55 pl-6">E-mail reenviado!</p>
+              ) : (
+                <form action={resendAction} className="pl-6">
+                  <input type="hidden" name="email" value={state.email} />
+                  <button
+                    type="submit"
+                    disabled={resendPending}
+                    className="font-body text-xs text-we-blue hover:underline disabled:opacity-50"
+                  >
+                    {resendPending ? "Enviando…" : "Reenviar e-mail de confirmação"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {state?.type === 'credentials' && (
+            <div className="mb-5 px-4 py-3 rounded-[8px] bg-we-red/10 border border-we-red/20">
+              <p className="font-body text-sm text-we-red">{state.error}</p>
+            </div>
+          )}
+
+          <form className="space-y-5" action={action}>
             <div className="space-y-1.5">
               <label className="block text-sm font-body text-we-ink/75" htmlFor="email">
                 E-mail
@@ -80,9 +127,9 @@ export default function LoginPage() {
                 <label className="block text-sm font-body text-we-ink/75" htmlFor="password">
                   Senha
                 </label>
-                <a href="#" className="text-xs font-body text-we-blue hover:underline">
+                <Link href="/recuperar-senha" className="text-xs font-body text-we-blue hover:underline">
                   Esqueceu a senha?
-                </a>
+                </Link>
               </div>
               <input
                 id="password"
@@ -103,6 +150,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              disabled={pending}
               className="
                 w-full h-11 rounded-[8px]
                 bg-we-blue text-white font-body font-semibold
@@ -110,10 +158,11 @@ export default function LoginPage() {
                 flex items-center justify-center gap-2
                 transition-all duration-150
                 focus:outline-none focus:ring-2 focus:ring-we-blue focus:ring-offset-2
+                disabled:opacity-60 disabled:cursor-not-allowed
               "
             >
-              Entrar
-              <ArrowRight size={16} />
+              {pending ? "Entrando…" : "Entrar"}
+              {!pending && <ArrowRight size={16} />}
             </button>
           </form>
 

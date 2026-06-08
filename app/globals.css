@@ -2,12 +2,19 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Coolvetica — carregada via @font-face; sem falha de build se o woff2 ainda não estiver no repo */
 @font-face {
   font-family: 'Coolvetica';
-  src: url('/fonts/coolvetica/coolvetica.woff2') format('woff2');
-  font-weight: normal;
+  src: url('/fonts/coolvetica/Coolvetica Rg.otf') format('opentype');
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Coolvetica';
+  src: url('/fonts/coolvetica/Coolvetica Rg It.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -165,5 +172,32 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .glass-light {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  .glass-dark {
+    background: rgba(47, 41, 53, 0.55);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .glass-input {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
   }
 }

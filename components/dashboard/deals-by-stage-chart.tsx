@@ -1,0 +1,63 @@
+'use client'
+
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+
+export type StageChartData = {
+  name: string
+  count: number
+  value: number
+  color: string
+}
+
+export function DealsByStageChart({ data }: { data: StageChartData[] }) {
+  const hasData = data.some(d => d.count > 0)
+
+  if (!hasData) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="font-mono text-xs text-we-paper/25">Nenhum negócio aberto ainda</p>
+      </div>
+    )
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+        <XAxis
+          dataKey="name"
+          tick={{ fill: 'rgba(237,237,235,0.45)', fontSize: 11, fontFamily: 'inherit' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          allowDecimals={false}
+          tick={{ fill: 'rgba(237,237,235,0.35)', fontSize: 11, fontFamily: 'inherit' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+          contentStyle={{
+            background: 'rgba(26,22,38,0.95)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: 8,
+            fontSize: 12,
+            fontFamily: 'inherit',
+          }}
+          labelStyle={{ color: '#EDEDEB', marginBottom: 4 }}
+          itemStyle={{ color: 'rgba(237,237,235,0.70)' }}
+          formatter={(val, name) => {
+            const n = Number(val)
+            if (name === 'count') return [`${n} negócio${n !== 1 ? 's' : ''}`, ''] as [string, string]
+            return [new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(n), ''] as [string, string]
+          }}
+        />
+        <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
+          {data.map((entry, i) => (
+            <Cell key={i} fill={entry.color} fillOpacity={0.80} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
