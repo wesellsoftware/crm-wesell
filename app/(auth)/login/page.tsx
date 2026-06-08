@@ -30,7 +30,7 @@ export default function LoginPage() {
         className="hidden lg:flex w-[480px] shrink-0 flex-col justify-between glass-dark p-12 relative z-10"
         style={{ background: "rgba(26,22,38,0.70)", borderRight: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <Image src="/assets/logo-oficial-horizontal.png" alt="WeSell CRM" width={140} height={38} className="h-9 w-auto" priority />
+        <Image src="/assets/logo-oficial-horizontal.png" alt="WeSell CRM" width={2026} height={686} priority />
 
         <div className="space-y-8">
           <h1 className="font-display text-5xl leading-[1.1] text-we-white">
@@ -63,7 +63,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md glass-light rounded-2xl px-10 py-10">
           {/* Logo mobile */}
           <div className="lg:hidden mb-10">
-            <Image src="/assets/logo-oficial-horizontal-preto.png" alt="WeSell CRM" width={130} height={35} className="h-8 w-auto" priority />
+            <Image src="/assets/logo-oficial-horizontal-preto.png" alt="WeSell CRM" width={2026} height={1000} className="h-10 w-auto" priority />
           </div>
 
           <div className="mb-8">

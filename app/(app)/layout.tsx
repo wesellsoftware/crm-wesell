@@ -1,6 +1,17 @@
 import { AppSidebar } from "@/components/app-sidebar"
+import { createClient } from "@/lib/supabase/server"
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data: profile } = user
+    ? await supabase
+        .from("profiles")
+        .select("avatar_url, full_name")
+        .eq("id", user.id)
+        .single()
+    : { data: null }
   return (
     <div
       className="flex h-screen overflow-hidden"
@@ -17,7 +28,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="absolute -bottom-24 left-1/3 w-[400px] h-[400px] rounded-full opacity-10"
           style={{ background: "radial-gradient(circle, #D7FE65 0%, transparent 70%)" }} />
       </div>
-      <AppSidebar />
+      <AppSidebar
+        avatarUrl={profile?.avatar_url ?? null}
+        fullName={profile?.full_name ?? ""}
+      />
       <main className="relative flex-1 overflow-y-auto">{children}</main>
     </div>
   )

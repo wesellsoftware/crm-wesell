@@ -3,6 +3,49 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+
+export async function uploadAvatar(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const file = formData.get('avatar')
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'Selecione uma imagem válida.' }
+  }
+  if (!AVATAR_MIME_TYPES.has(file.type)) {
+    return { error: 'Formato não suportado. Use JPG, PNG, WebP ou GIF.' }
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return { error: 'A imagem deve ter no máximo 2 MB.' }
+  }
+
+  const ext = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg'
+  const path = `${user.id}/avatar.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type })
+
+  if (uploadError) return { error: uploadError.message }
+
+  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+  const avatarUrl = `${publicUrl}?t=${Date.now()}`
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', user.id)
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/configuracoes')
+  return { success: true, avatarUrl }
+}
+
 export async function updateProfile(_: unknown, formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

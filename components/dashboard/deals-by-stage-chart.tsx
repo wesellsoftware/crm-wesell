@@ -2,6 +2,8 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
+const breeSerif = "'Bree Serif', Georgia, serif"
+
 export type StageChartData = {
   name: string
   count: number
@@ -25,13 +27,13 @@ export function DealsByStageChart({ data }: { data: StageChartData[] }) {
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
         <XAxis
           dataKey="name"
-          tick={{ fill: 'rgba(237,237,235,0.45)', fontSize: 11, fontFamily: 'inherit' }}
+          tick={{ fill: 'rgba(237,237,235,0.45)', fontSize: 11, fontFamily: breeSerif }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           allowDecimals={false}
-          tick={{ fill: 'rgba(237,237,235,0.35)', fontSize: 11, fontFamily: 'inherit' }}
+          tick={{ fill: 'rgba(237,237,235,0.35)', fontSize: 11, fontFamily: breeSerif }}
           axisLine={false}
           tickLine={false}
         />
@@ -42,7 +44,7 @@ export function DealsByStageChart({ data }: { data: StageChartData[] }) {
             border: '1px solid rgba(255,255,255,0.10)',
             borderRadius: 8,
             fontSize: 12,
-            fontFamily: 'inherit',
+            fontFamily: breeSerif,
           }}
           labelStyle={{ color: '#EDEDEB', marginBottom: 4 }}
           itemStyle={{ color: 'rgba(237,237,235,0.70)' }}

@@ -4,9 +4,10 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
-  LayoutDashboard,
-  Kanban,
   Users,
+  DollarSign,
+  Target,
+  Building2,
   CheckSquare,
   BarChart2,
   Settings,
@@ -14,34 +15,40 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logout } from "@/app/actions/auth"
+import { SidebarUserAvatar } from "@/components/sidebar-user-avatar"
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/funil", label: "Funil", icon: Kanban },
-  { href: "/contatos", label: "Contatos", icon: Users },
+  { href: "/dashboard", label: "Painel de vendas", icon: BarChart2 },
+  { href: "/boards/contatos", label: "Contatos", icon: Users },
+  { href: "/boards/negociacoes", label: "Negociações", icon: DollarSign },
+  { href: "/boards/leads", label: "Leads", icon: Target },
+  { href: "/boards/contas", label: "Contas", icon: Building2 },
   { href: "/atividades", label: "Atividades", icon: CheckSquare },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart2 },
   { href: "/configuracoes", label: "Config.", icon: Settings },
 ]
 
-export function AppSidebar() {
+type AppSidebarProps = {
+  avatarUrl: string | null
+  fullName: string
+}
+
+export function AppSidebar({ avatarUrl, fullName }: AppSidebarProps) {
   const pathname = usePathname()
 
   return (
     <aside className="glass-dark relative flex flex-col w-56 shrink-0 border-r-0">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/[0.07]">
+      <div className="flex items-center justify-between px-5 py-5 border-b border-white/[0.07]">
         <Image
           src="/assets/logo-oficial-horizontal.png"
           alt="WeSell CRM"
           width={120}
           height={32}
-          className="h-8 w-auto"
+          className="h-8 w-auto shrink-0"
           priority
         />
+        <SidebarUserAvatar avatarUrl={avatarUrl} fullName={fullName} />
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href)
@@ -57,13 +64,12 @@ export function AppSidebar() {
               )}
             >
               <Icon size={16} />
-              <span className={cn(label.startsWith("{") && "font-mono text-xs")}>{label}</span>
+              <span>{label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Bottom */}
       <div className="px-3 py-4 border-t border-white/[0.07]">
         <form action={logout}>
           <button
