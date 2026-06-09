@@ -58,6 +58,11 @@ export function getFeedEventIconType(eventType: FeedEventType): string {
       return 'deleted'
     case 'webhook_toggled':
       return 'webhook'
+    case 'member_invited':
+    case 'member_role_updated':
+      return 'created'
+    case 'member_removed':
+      return 'deleted'
     default:
       return 'default'
   }

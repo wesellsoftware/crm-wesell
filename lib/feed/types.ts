@@ -22,6 +22,9 @@ export type FeedEventType =
   | 'lead_created_external'
   | 'item_converted'
   | 'item_deleted'
+  | 'member_invited'
+  | 'member_role_updated'
+  | 'member_removed'
 
 export interface FeedEvent {
   id: string

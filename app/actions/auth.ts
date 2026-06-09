@@ -1,7 +1,7 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getAppOrigin } from '@/lib/app-url'
 import { createClient } from '@/lib/supabase/server'
 
 export async function login(_: unknown, formData: FormData) {
@@ -63,8 +63,7 @@ export async function logout() {
 
 export async function forgotPassword(_: unknown, formData: FormData) {
   const supabase = await createClient()
-  const headersList = await headers()
-  const origin = headersList.get('origin') ?? 'http://localhost:3000'
+  const origin = await getAppOrigin()
 
   const { error } = await supabase.auth.resetPasswordForEmail(
     formData.get('email') as string,
@@ -83,5 +82,37 @@ export async function updatePassword(_: unknown, formData: FormData) {
   })
 
   if (error) return { error: error.message }
+  redirect('/dashboard')
+}
+
+export async function completeInvite(_: unknown, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Sessão expirada. Abra o link do convite novamente.' }
+
+  const invitedOrgId = user.user_metadata?.organization_id as string | undefined
+  if (!invitedOrgId) return { error: 'Este link não é de um convite válido.' }
+
+  const fullName = (formData.get('full_name') as string)?.trim()
+  const password = formData.get('password') as string
+
+  if (!fullName) return { error: 'Informe seu nome.' }
+
+  const { error: passwordError } = await supabase.auth.updateUser({
+    password,
+    data: { full_name: fullName },
+  })
+
+  if (passwordError) return { error: passwordError.message }
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ full_name: fullName })
+    .eq('id', user.id)
+    .eq('role', 'member')
+
+  if (profileError) return { error: profileError.message }
+
   redirect('/dashboard')
 }
