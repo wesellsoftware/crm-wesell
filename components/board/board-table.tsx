@@ -170,11 +170,7 @@ export function BoardTable({
   const [, startReorder] = useTransition()
   const [, startItemReorder] = useTransition()
 
-  const groupSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  )
-
-  const itemSensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
@@ -222,6 +218,15 @@ export function BoardTable({
     startItemReorder(() => {
       void reorderItems(groupId, orderedIds, slug)
     })
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const dragType = event.active.data.current?.type
+    if (dragType === 'group') {
+      handleGroupDragEnd(event)
+    } else if (dragType === 'item') {
+      handleItemDragEnd(event)
+    }
   }
 
   function handleGroupDragEnd(event: DragEndEvent) {
@@ -347,46 +352,40 @@ export function BoardTable({
   return (
     <div>
       <DndContext
-        sensors={groupSensors}
+        sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={handleGroupDragEnd}
+        onDragEnd={handleDragEnd}
       >
         <SortableContext
           items={localGroups.map(g => g.id)}
           strategy={verticalListSortingStrategy}
         >
-          <DndContext
-            sensors={itemSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleItemDragEnd}
-          >
-            {localGroups.map(group => (
-              <SortableBoardGroup
-                key={group.id}
-                group={group}
-                columns={columns}
-                items={localItems}
-                values={values}
-                slug={slug}
-                boardId={boardId}
-                members={members}
-                relatedItems={relatedItems}
-                localValues={localValues}
-                onValueUpdate={handleValueUpdate}
-                searchQuery={searchQuery}
-                autoAddOpen={autoAddGroupId === group.id}
-                onAutoAddDone={onAutoAddDone}
-                onGroupUpdate={handleGroupUpdate}
+          {localGroups.map(group => (
+            <SortableBoardGroup
+              key={group.id}
+              group={group}
+              columns={columns}
+              items={localItems}
+              values={values}
+              slug={slug}
+              boardId={boardId}
+              members={members}
+              relatedItems={relatedItems}
+              localValues={localValues}
+              onValueUpdate={handleValueUpdate}
+              searchQuery={searchQuery}
+              autoAddOpen={autoAddGroupId === group.id}
+              onAutoAddDone={onAutoAddDone}
+              onGroupUpdate={handleGroupUpdate}
               onGroupDelete={handleGroupDelete}
               onColumnUpdate={onColumnUpdate}
-                onColumnDelete={onColumnDelete}
-                onColumnsReorder={onColumnsReorder}
-                onColumnWidthChange={onColumnWidthChange}
-                onColumnWidthPersist={onColumnWidthPersist}
-                onItemOpen={setSelectedItem}
-              />
-            ))}
-          </DndContext>
+              onColumnDelete={onColumnDelete}
+              onColumnsReorder={onColumnsReorder}
+              onColumnWidthChange={onColumnWidthChange}
+              onColumnWidthPersist={onColumnWidthPersist}
+              onItemOpen={setSelectedItem}
+            />
+          ))}
         </SortableContext>
       </DndContext>
       <AddGroupButton
