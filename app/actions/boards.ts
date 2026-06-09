@@ -6,7 +6,7 @@ import { getRelationItems as fetchRelationItems } from '@/lib/boards/queries'
 import { isWonGroupName } from '@/lib/boards/won-group'
 import {
   isWonStageLabel,
-  syncDealWonState,
+  syncDealClosedAt,
 } from '@/lib/boards/deal-close-sync'
 import { canDeleteBoardColumn, canRenameBoardColumn } from '@/lib/boards/fixed-columns'
 import { canDeleteBoardGroup } from '@/lib/boards/fixed-groups'
@@ -240,6 +240,7 @@ export async function createItem(boardId: string, groupId: string, name: string,
     .from('board_items')
     .select('position')
     .eq('group_id', groupId)
+    .is('deleted_at', null)
     .order('position', { ascending: false })
     .limit(1)
     .single()
@@ -370,37 +371,153 @@ export async function deleteItem(itemId: string, slug: string) {
 
   const { data: item } = await ctx.supabase
     .from('board_items')
-    .select('name, board:boards(slug, name, organization_id)')
+    .select('name, deleted_at, board:boards(slug, name, organization_id)')
     .eq('id', itemId)
     .single()
 
-  const { error } = await ctx.supabase.from('board_items').delete().eq('id', itemId)
+  if (!item) return { error: 'Item não encontrado' }
+  if (item.deleted_at) return { error: 'Item já está na lixeira' }
+
+  const { error } = await ctx.supabase
+    .from('board_items')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', itemId)
+
   if (error) return { error: error.message }
 
-  if (item) {
-    const board = item.board as unknown as {
-      slug: string
-      name: string
-      organization_id: string
-    }
-    await logFeedEvent(ctx.supabase, {
-      organizationId: board.organization_id,
-      userId: ctx.user.id,
-      category: 'board',
-      eventType: 'item_deleted',
-      summary: `excluiu ${item.name} de ${board.name}`,
-      entityType: 'board_item',
-      entityId: itemId,
-      metadata: {
-        board_slug: board.slug,
-        board_name: board.name,
-        item_name: item.name,
-      },
-    })
+  const board = item.board as unknown as {
+    slug: string
+    name: string
+    organization_id: string
   }
+  await logFeedEvent(ctx.supabase, {
+    organizationId: board.organization_id,
+    userId: ctx.user.id,
+    category: 'board',
+    eventType: 'item_deleted',
+    summary: `moveu ${item.name} para a lixeira em ${board.name}`,
+    entityType: 'board_item',
+    entityId: itemId,
+    metadata: {
+      board_slug: board.slug,
+      board_name: board.name,
+      item_name: item.name,
+      soft_delete: true,
+    },
+  })
 
   revalidateBoard(slug)
   return { success: true }
+}
+
+export async function restoreItem(itemId: string, slug: string) {
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Não autenticado' }
+
+  const { data: item } = await ctx.supabase
+    .from('board_items')
+    .select('name, deleted_at, board:boards(slug, name, organization_id)')
+    .eq('id', itemId)
+    .single()
+
+  if (!item) return { error: 'Item não encontrado' }
+  if (!item.deleted_at) return { error: 'Item não está na lixeira' }
+
+  const { error } = await ctx.supabase
+    .from('board_items')
+    .update({ deleted_at: null })
+    .eq('id', itemId)
+
+  if (error) return { error: error.message }
+
+  const board = item.board as unknown as {
+    slug: string
+    name: string
+    organization_id: string
+  }
+  await logFeedEvent(ctx.supabase, {
+    organizationId: board.organization_id,
+    userId: ctx.user.id,
+    category: 'board',
+    eventType: 'item_restored',
+    summary: `restaurou ${item.name} em ${board.name}`,
+    entityType: 'board_item',
+    entityId: itemId,
+    metadata: {
+      board_slug: board.slug,
+      board_name: board.name,
+      item_name: item.name,
+    },
+  })
+
+  revalidateBoard(slug)
+  return { success: true }
+}
+
+export async function emptyBoardTrash(boardId: string, slug: string) {
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Não autenticado' }
+
+  const { data: items, error: fetchError } = await ctx.supabase
+    .from('board_items')
+    .select('id, name, board:boards(slug, name, organization_id)')
+    .eq('board_id', boardId)
+    .not('deleted_at', 'is', null)
+
+  if (fetchError) return { error: fetchError.message }
+  if (!items?.length) return { success: true, count: 0 }
+
+  const itemIds = items.map(i => i.id)
+  const { error } = await ctx.supabase.from('board_items').delete().in('id', itemIds)
+  if (error) return { error: error.message }
+
+  const firstBoard = items[0].board as unknown as {
+    slug: string
+    name: string
+    organization_id: string
+  }
+  await logFeedEvent(ctx.supabase, {
+    organizationId: firstBoard.organization_id,
+    userId: ctx.user.id,
+    category: 'board',
+    eventType: 'trash_emptied',
+    summary: `esvaziou a lixeira de ${firstBoard.name} (${items.length} itens)`,
+    entityType: 'board',
+    entityId: boardId,
+    metadata: {
+      board_slug: firstBoard.slug,
+      board_name: firstBoard.name,
+      item_count: items.length,
+      item_names: items.map(i => i.name),
+    },
+  })
+
+  revalidateBoard(slug)
+  return { success: true, count: items.length }
+}
+
+export async function getTrashItems(boardId: string) {
+  const ctx = await getOrgContext()
+  if (!ctx) return { error: 'Não autenticado', items: [] }
+
+  const { data: items, error } = await ctx.supabase
+    .from('board_items')
+    .select('id, name, group_id, deleted_at, group:board_groups(name)')
+    .eq('board_id', boardId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+
+  if (error) return { error: error.message, items: [] }
+
+  return {
+    items: (items ?? []).map(item => ({
+      id: item.id,
+      name: item.name,
+      group_id: item.group_id,
+      group_name: (item.group as unknown as { name: string })?.name ?? '—',
+      deleted_at: item.deleted_at as string,
+    })),
+  }
 }
 
 export async function upsertItemValue(itemId: string, columnId: string, value: CellValue, slug: string) {
@@ -765,7 +882,7 @@ export async function updateDealEtapa(itemId: string, optionId: string, slug: st
 
   const isWon = selected ? isWonStageLabel(selected.label) : false
 
-  await syncDealWonState(ctx.supabase, itemId, board.id, isWon)
+  await syncDealClosedAt(ctx.supabase, itemId, isWon)
 
   revalidateBoard(slug)
   return { success: true }

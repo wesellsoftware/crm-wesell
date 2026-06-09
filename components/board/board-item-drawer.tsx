@@ -1,13 +1,15 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
+import { Trash2 } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { deleteItem } from '@/app/actions/boards'
 import type {
   BoardColumn,
   BoardGroup,
@@ -139,6 +141,7 @@ interface BoardItemDrawerProps {
   currentUserId?: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDeleted?: (itemId: string) => void
 }
 
 export function BoardItemDrawer({
@@ -152,8 +155,20 @@ export function BoardItemDrawer({
   currentUserId,
   open,
   onOpenChange,
+  onDeleted,
 }: BoardItemDrawerProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setConfirmDelete(false)
+    setDeleteError(null)
+  }, [item?.id, open])
+
   if (!item) return null
+
+  const itemId = item.id
 
   const group = groups.find(g => g.id === item.group_id)
   const displayColumns = columns.filter(c => !c.is_primary)
@@ -161,6 +176,20 @@ export function BoardItemDrawer({
   const createdBy = item.created_by
     ? members.find(m => m.id === item.created_by) ?? null
     : null
+
+  function handleDelete() {
+    setDeleteError(null)
+    startTransition(async () => {
+      const result = await deleteItem(itemId, slug)
+      if (result.error) {
+        setDeleteError(result.error)
+        return
+      }
+      onDeleted?.(itemId)
+      setConfirmDelete(false)
+      onOpenChange(false)
+    })
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -232,7 +261,7 @@ export function BoardItemDrawer({
             )}
           </section>
 
-          <section className="border-t border-white/[0.06] pt-4 pb-6">
+          <section className="border-t border-white/[0.06] pt-4">
             <ItemActivityFeed
               item={item}
               slug={slug}
@@ -242,6 +271,49 @@ export function BoardItemDrawer({
               createdBy={createdBy}
               currentUserId={currentUserId}
             />
+          </section>
+
+          <section className="border-t border-white/[0.06] pt-4 pb-6">
+            {confirmDelete ? (
+              <div className="rounded-lg border border-we-red/20 bg-we-red/5 p-4 space-y-3">
+                <p className="font-body text-sm text-we-paper/80">
+                  Mover <span className="font-medium text-we-paper">{item.name}</span> para a lixeira?
+                </p>
+                <p className="font-body text-xs text-we-paper/45">
+                  Você poderá restaurar este item na lixeira do board.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isPending}
+                    className="px-3 py-1.5 rounded-md bg-we-red/90 text-white text-xs font-body hover:bg-we-red transition-colors disabled:opacity-50"
+                  >
+                    {isPending ? 'Movendo…' : 'Mover para lixeira'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmDelete(false); setDeleteError(null) }}
+                    disabled={isPending}
+                    className="px-3 py-1.5 rounded-md text-xs font-body text-we-paper/50 hover:text-we-paper/70 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-we-paper/40 hover:text-we-red hover:bg-we-red/10 transition-colors text-sm font-body"
+              >
+                <Trash2 size={14} />
+                Excluir item
+              </button>
+            )}
+            {deleteError && (
+              <p className="mt-2 font-body text-xs text-we-red/80">{deleteError}</p>
+            )}
           </section>
         </div>
       </SheetContent>

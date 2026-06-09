@@ -6,6 +6,7 @@ import {
   DragEndEvent,
   PointerSensor,
   closestCenter,
+  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -51,7 +52,6 @@ interface BoardGroupSectionProps {
   onAutoAddDone?: () => void
   onGroupUpdate: (groupId: string, updates: Partial<BoardGroup>) => void
   onGroupDelete: (groupId: string) => void
-  onItemsReorder: (groupId: string, itemIds: string[]) => void
   onColumnUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
   onColumnDelete?: (columnId: string) => void
   onColumnsReorder?: (columnIds: string[]) => void
@@ -303,7 +303,6 @@ export function BoardGroupSection({
   onAutoAddDone,
   onGroupUpdate,
   onGroupDelete,
-  onItemsReorder,
   onColumnUpdate,
   onColumnDelete,
   onColumnsReorder,
@@ -328,13 +327,14 @@ export function BoardGroupSection({
     [items, group.id, searchQuery]
   )
 
-  const itemSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  )
-
   const columnSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `group:${group.id}`,
+    data: { type: 'group-drop', groupId: group.id },
+  })
 
   function toggleCollapse() {
     const next = !collapsed
@@ -344,20 +344,6 @@ export function BoardGroupSection({
 
   function handleNameEdit(itemId: string, name: string) {
     startTransition(() => { void updateItemName(itemId, name, slug) })
-  }
-
-  function handleItemDragEnd(event: DragEndEvent) {
-    if (event.active.data.current?.type !== 'item') return
-
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = groupItems.findIndex(i => i.id === active.id)
-    const newIndex = groupItems.findIndex(i => i.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    const reordered = arrayMove(groupItems, oldIndex, newIndex)
-    onItemsReorder(group.id, reordered.map(i => i.id))
   }
 
   function handleColumnDragEnd(event: DragEndEvent) {
@@ -477,20 +463,20 @@ export function BoardGroupSection({
                 )}
               </tr>
             </thead>
-            <tbody>
+            <tbody
+              ref={setDropRef}
+              className={cn(
+                isOver && 'bg-we-blue/[0.06]',
+                groupItems.length === 0 && 'min-h-[52px]'
+              )}
+            >
               {canReorder ? (
-                <DndContext
-                  sensors={itemSensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleItemDragEnd}
+                <SortableContext
+                  items={groupItems.map(i => i.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <SortableContext
-                    items={groupItems.map(i => i.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {itemRows}
-                  </SortableContext>
-                </DndContext>
+                  {itemRows}
+                </SortableContext>
               ) : (
                 itemRows
               )}

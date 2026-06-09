@@ -66,6 +66,15 @@ export interface BoardItem {
   created_at: string
   updated_at: string
   closed_at: string | null
+  deleted_at: string | null
+}
+
+export interface DeletedBoardItem {
+  id: string
+  name: string
+  group_id: string
+  group_name: string
+  deleted_at: string
 }
 
 export type CellValue =

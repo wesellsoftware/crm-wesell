@@ -17,13 +17,64 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { BoardColumn, BoardGroup, BoardItem, BoardItemValue, CellValue, OrgMember, RelatedItem } from '@/lib/boards/types'
-import { reorderGroups, reorderItems } from '@/app/actions/boards'
+import { moveItemToGroup, reorderGroups, reorderItems } from '@/app/actions/boards'
+import { fireConfettiSideCannons } from '@/lib/confetti-side-cannons'
+import { isWonGroupName } from '@/lib/boards/won-group'
 import { BoardGroupSection } from './board-group'
 import { AddGroupButton } from './add-group-button'
 import { BoardItemDrawer } from './board-item-drawer'
 
 function sortGroupsByPosition(groups: BoardGroup[]) {
   return [...groups].sort((a, b) => a.position - b.position)
+}
+
+function getGroupItems(items: BoardItem[], groupId: string) {
+  return items
+    .filter(i => i.group_id === groupId)
+    .sort((a, b) => a.position - b.position)
+}
+
+function findItemGroupId(items: BoardItem[], itemId: string) {
+  return items.find(i => i.id === itemId)?.group_id
+}
+
+function resolveTargetGroupId(items: BoardItem[], overId: string) {
+  if (overId.startsWith('group:')) return overId.slice('group:'.length)
+  return findItemGroupId(items, overId) ?? null
+}
+
+function applyItemsByGroup(
+  groups: BoardGroup[],
+  allItems: BoardItem[],
+  itemsByGroup: Record<string, BoardItem[]>
+) {
+  const itemMap = new Map(allItems.map(item => [item.id, item]))
+  const next: BoardItem[] = []
+
+  for (const group of groups) {
+    const groupItems = itemsByGroup[group.id] ?? []
+    groupItems.forEach((item, position) => {
+      const source = itemMap.get(item.id) ?? item
+      next.push({ ...source, group_id: group.id, position })
+    })
+  }
+
+  return next
+}
+
+function mergeServerItems(serverItems: BoardItem[], localItems: BoardItem[]) {
+  const localById = new Map(localItems.map(item => [item.id, item]))
+
+  return serverItems.map(serverItem => {
+    const local = localById.get(serverItem.id)
+    if (!local) return serverItem
+
+    if (local.group_id !== serverItem.group_id || local.position !== serverItem.position) {
+      return { ...serverItem, group_id: local.group_id, position: local.position }
+    }
+
+    return serverItem
+  })
 }
 
 interface SortableBoardGroupProps {
@@ -42,7 +93,6 @@ interface SortableBoardGroupProps {
   onAutoAddDone?: () => void
   onGroupUpdate: (groupId: string, updates: Partial<BoardGroup>) => void
   onGroupDelete: (groupId: string) => void
-  onItemsReorder: (groupId: string, itemIds: string[]) => void
   onColumnUpdate?: (columnId: string, updates: Partial<BoardColumn>) => void
   onColumnDelete?: (columnId: string) => void
   onColumnsReorder?: (columnIds: string[]) => void
@@ -120,7 +170,11 @@ export function BoardTable({
   const [, startReorder] = useTransition()
   const [, startItemReorder] = useTransition()
 
-  const sensors = useSensors(
+  const groupSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
+
+  const itemSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
@@ -133,8 +187,15 @@ export function BoardTable({
   }, [values])
 
   useEffect(() => {
-    setLocalItems(items)
+    setLocalItems(prev => mergeServerItems(items, prev))
   }, [items])
+
+  useEffect(() => {
+    setSelectedItem(prev => {
+      if (!prev) return null
+      return localItems.find(item => item.id === prev.id) ?? prev
+    })
+  }, [localItems])
 
   function handleGroupUpdate(groupId: string, updates: Partial<BoardGroup>) {
     setLocalGroups(prev =>
@@ -163,7 +224,7 @@ export function BoardTable({
     })
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  function handleGroupDragEnd(event: DragEndEvent) {
     if (event.active.data.current?.type !== 'group') return
 
     const { active, over } = event
@@ -184,6 +245,91 @@ export function BoardTable({
     })
   }
 
+  function handleItemDragEnd(event: DragEndEvent) {
+    if (searchQuery) return
+    if (event.active.data.current?.type !== 'item') return
+
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    const activeGroupId = findItemGroupId(localItems, activeId)
+    const targetGroupId = resolveTargetGroupId(localItems, overId)
+
+    if (!activeGroupId || !targetGroupId) return
+
+    const activeItem = localItems.find(i => i.id === activeId)
+    if (!activeItem) return
+
+    if (activeGroupId === targetGroupId) {
+      if (activeId === overId) return
+
+      const groupItems = getGroupItems(localItems, targetGroupId)
+      const oldIndex = groupItems.findIndex(i => i.id === activeId)
+      const newIndex = groupItems.findIndex(i => i.id === overId)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const reordered = arrayMove(groupItems, oldIndex, newIndex)
+      handleItemsReorder(targetGroupId, reordered.map(i => i.id))
+      return
+    }
+
+    const sourceItems = getGroupItems(localItems, activeGroupId).filter(i => i.id !== activeId)
+    const targetItems = getGroupItems(localItems, targetGroupId).filter(i => i.id !== activeId)
+
+    let insertIndex = targetItems.length
+    if (!overId.startsWith('group:')) {
+      const overIndex = getGroupItems(localItems, targetGroupId).findIndex(i => i.id === overId)
+      if (overIndex >= 0) insertIndex = overIndex
+    }
+
+    const nextTargetItems = [...targetItems]
+    nextTargetItems.splice(insertIndex, 0, { ...activeItem, group_id: targetGroupId })
+
+    const itemsByGroup: Record<string, BoardItem[]> = {
+      [activeGroupId]: sourceItems,
+      [targetGroupId]: nextTargetItems,
+    }
+    for (const group of localGroups) {
+      if (!(group.id in itemsByGroup)) {
+        itemsByGroup[group.id] = getGroupItems(localItems, group.id).filter(i => i.id !== activeId)
+      }
+    }
+
+    setLocalItems(applyItemsByGroup(localGroups, localItems, itemsByGroup))
+
+    const targetGroup = localGroups.find(g => g.id === targetGroupId)
+    const wasInWon = localGroups.some(
+      g => g.id === activeGroupId && isWonGroupName(g.name)
+    )
+    if (targetGroup && isWonGroupName(targetGroup.name) && !wasInWon) {
+      fireConfettiSideCannons()
+    }
+
+    startItemReorder(async () => {
+      const moveResult = await moveItemToGroup(activeId, targetGroupId, slug)
+      if (moveResult?.error) {
+        setLocalItems(prev =>
+          prev.map(item =>
+            item.id === activeId ? { ...item, group_id: activeGroupId } : item
+          )
+        )
+        return
+      }
+
+      await reorderItems(targetGroupId, nextTargetItems.map(i => i.id), slug)
+      if (sourceItems.length > 0) {
+        await reorderItems(activeGroupId, sourceItems.map(i => i.id), slug)
+      }
+    })
+  }
+
+  function handleItemDeleted(itemId: string) {
+    setLocalItems(prev => prev.filter(item => item.id !== itemId))
+    setSelectedItem(null)
+  }
+
   function handleValueUpdate(itemId: string, columnId: string, value: CellValue) {
     setLocalValues(prev => {
       const existing = prev.find(v => v.item_id === itemId && v.column_id === columnId)
@@ -200,38 +346,47 @@ export function BoardTable({
 
   return (
     <div>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={groupSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleGroupDragEnd}
+      >
         <SortableContext
           items={localGroups.map(g => g.id)}
           strategy={verticalListSortingStrategy}
         >
-          {localGroups.map(group => (
-            <SortableBoardGroup
-              key={group.id}
-              group={group}
-              columns={columns}
-              items={localItems}
-              values={values}
-              slug={slug}
-              boardId={boardId}
-              members={members}
-              relatedItems={relatedItems}
-              localValues={localValues}
-              onValueUpdate={handleValueUpdate}
-              searchQuery={searchQuery}
-              autoAddOpen={autoAddGroupId === group.id}
-              onAutoAddDone={onAutoAddDone}
-              onGroupUpdate={handleGroupUpdate}
+          <DndContext
+            sensors={itemSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleItemDragEnd}
+          >
+            {localGroups.map(group => (
+              <SortableBoardGroup
+                key={group.id}
+                group={group}
+                columns={columns}
+                items={localItems}
+                values={values}
+                slug={slug}
+                boardId={boardId}
+                members={members}
+                relatedItems={relatedItems}
+                localValues={localValues}
+                onValueUpdate={handleValueUpdate}
+                searchQuery={searchQuery}
+                autoAddOpen={autoAddGroupId === group.id}
+                onAutoAddDone={onAutoAddDone}
+                onGroupUpdate={handleGroupUpdate}
               onGroupDelete={handleGroupDelete}
-              onItemsReorder={handleItemsReorder}
               onColumnUpdate={onColumnUpdate}
-              onColumnDelete={onColumnDelete}
-              onColumnsReorder={onColumnsReorder}
-              onColumnWidthChange={onColumnWidthChange}
-              onColumnWidthPersist={onColumnWidthPersist}
-              onItemOpen={setSelectedItem}
-            />
-          ))}
+                onColumnDelete={onColumnDelete}
+                onColumnsReorder={onColumnsReorder}
+                onColumnWidthChange={onColumnWidthChange}
+                onColumnWidthPersist={onColumnWidthPersist}
+                onItemOpen={setSelectedItem}
+              />
+            ))}
+          </DndContext>
         </SortableContext>
       </DndContext>
       <AddGroupButton
@@ -252,6 +407,7 @@ export function BoardTable({
         currentUserId={currentUserId}
         open={selectedItem !== null}
         onOpenChange={open => { if (!open) setSelectedItem(null) }}
+        onDeleted={handleItemDeleted}
       />
     </div>
   )

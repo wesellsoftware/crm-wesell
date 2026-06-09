@@ -113,6 +113,7 @@ export async function createExternalLead(
       .from('board_items')
       .select('position')
       .eq('board_id', board.id)
+      .is('deleted_at', null)
       .order('position', { ascending: false })
       .limit(1)
       .maybeSingle(),

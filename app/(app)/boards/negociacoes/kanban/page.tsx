@@ -21,6 +21,7 @@ export default async function NegociacoesKanbanPage() {
 
   return (
     <NegociacoesKanban
+      boardId={data.board.id}
       groups={data.groups}
       itemsByGroup={data.itemsByGroup}
       values={data.values}

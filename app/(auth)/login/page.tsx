@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, MailWarning } from "lucide-react"
-import { useActionState } from "react"
+import { ArrowRight, Eye, EyeOff, MailWarning } from "lucide-react"
+import { useActionState, useState } from "react"
 import { login, resendVerification } from "@/app/actions/auth"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
   const [resendState, resendAction, resendPending] = useActionState(resendVerification, undefined)
+  const [showPassword, setShowPassword] = useState(false)
 
   return (
     <div
@@ -131,21 +132,31 @@ export default function LoginPage() {
                   Esqueceu a senha?
                 </Link>
               </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                placeholder="••••••••"
-                className="
-                  w-full h-11 px-4 rounded-[8px]
-                  border border-we-ink/15 bg-we-paper/40
-                  font-body text-we-ink placeholder:text-we-ink/35
-                  focus:outline-none focus:ring-2 focus:ring-we-blue focus:border-transparent
-                  transition-shadow duration-150
-                "
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  placeholder="••••••••"
+                  className="
+                    w-full h-11 px-4 pr-11 rounded-[8px]
+                    border border-we-ink/15 bg-we-paper/40
+                    font-body text-we-ink placeholder:text-we-ink/35
+                    focus:outline-none focus:ring-2 focus:ring-we-blue focus:border-transparent
+                    transition-shadow duration-150
+                  "
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-we-ink/35 hover:text-we-ink/70 transition-colors"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <button

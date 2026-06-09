@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -29,6 +31,7 @@ import { AvatarGroup } from '@/components/ui/avatar'
 import { PageTitle } from '@/components/page-title'
 import { MemberAvatar } from './cells/member-avatar'
 import { BoardItemDrawer } from './board-item-drawer'
+import { BoardTrashSheet } from './board-trash-sheet'
 
 function getResponsibleMembers(
   itemId: string,
@@ -180,6 +183,7 @@ function KanbanGroupColumn({
 }
 
 interface NegociacoesKanbanProps {
+  boardId: string
   groups: BoardGroup[]
   itemsByGroup: Record<string, BoardItem[]>
   values: BoardItemValue[]
@@ -194,6 +198,7 @@ interface NegociacoesKanbanProps {
 }
 
 export function NegociacoesKanban({
+  boardId,
   groups,
   itemsByGroup,
   values,
@@ -206,8 +211,10 @@ export function NegociacoesKanban({
   relatedNames,
   currentUserId,
 }: NegociacoesKanbanProps) {
+  const router = useRouter()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<BoardItem | null>(null)
+  const [trashOpen, setTrashOpen] = useState(false)
   const [, startTransition] = useTransition()
   const [localItemsByGroup, setLocalItemsByGroup] = useState(itemsByGroup)
   const [localGroups, setLocalGroups] = useState(groups)
@@ -257,6 +264,17 @@ export function NegociacoesKanban({
     startTransition(() => { void moveItemToGroup(itemId, groupId, 'negociacoes') })
   }
 
+  function handleItemDeleted(itemId: string) {
+    setLocalItemsByGroup(prev => {
+      const next: Record<string, BoardItem[]> = {}
+      for (const key of Object.keys(prev)) {
+        next[key] = prev[key].filter(i => i.id !== itemId)
+      }
+      return next
+    })
+    setSelectedItem(null)
+  }
+
   const activeItem = activeId
     ? Object.values(localItemsByGroup).flat().find(i => i.id === activeId)
     : null
@@ -275,6 +293,14 @@ export function NegociacoesKanban({
           <span className="font-body text-sm text-we-blue border-b-2 border-we-blue pb-2 -mb-px">
             Pipeline
           </span>
+          <button
+            type="button"
+            onClick={() => setTrashOpen(true)}
+            className="ml-auto flex items-center gap-1.5 font-body text-sm text-we-paper/40 hover:text-we-paper/60 pb-2 transition-colors"
+          >
+            <Trash2 size={14} />
+            Lixeira
+          </button>
         </div>
       </div>
 
@@ -349,6 +375,16 @@ export function NegociacoesKanban({
         currentUserId={currentUserId}
         open={selectedItem !== null}
         onOpenChange={open => { if (!open) setSelectedItem(null) }}
+        onDeleted={handleItemDeleted}
+      />
+
+      <BoardTrashSheet
+        boardId={boardId}
+        slug="negociacoes"
+        itemLabel="oportunidade"
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+        onRestore={() => router.refresh()}
       />
     </div>
   )

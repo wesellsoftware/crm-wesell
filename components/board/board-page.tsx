@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { BoardColumn, BoardData } from '@/lib/boards/types'
 import { reorderColumns, updateColumnSettings } from '@/app/actions/boards'
 import { sortColumnsByPosition } from '@/lib/boards/column-layout'
@@ -22,6 +23,7 @@ interface BoardPageClientProps {
 }
 
 export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [autoAddGroupId, setAutoAddGroupId] = useState<string | null>(null)
   const [localColumns, setLocalColumns] = useState(() => sortColumnsByPosition(data.columns))
@@ -115,6 +117,7 @@ export function BoardPageClient({ data, currentUserId }: BoardPageClientProps) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onCreateClick={handleCreateClick}
+        onItemsRestored={() => router.refresh()}
       />
 
       <div className="flex-1 px-6 py-4">

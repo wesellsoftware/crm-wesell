@@ -7,6 +7,7 @@ import { SalesKpis } from '@/components/dashboard/sales-kpis'
 import { RevenueByProductChart } from '@/components/relatorios/revenue-by-product-chart'
 import { TopSellersRanking } from '@/components/relatorios/top-sellers-ranking'
 import { PageTitle } from '@/components/page-title'
+import { MemberAvatar } from '@/components/board/cells/member-avatar'
 import { formatRelativeTime } from '@/lib/feed/format-feed-event'
 import { FEED_CATEGORY_LABELS } from '@/lib/feed/types'
 import Link from 'next/link'
@@ -108,17 +109,31 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <ul className="space-y-3">
-              {recentEvents.map(event => (
-                <li key={event.id} className="flex items-start gap-3">
-                  <span className="mt-1.5 size-2 rounded-full shrink-0 bg-we-blue/60" />
-                  <div className="min-w-0">
-                    <p className="font-body text-sm text-we-paper/80 line-clamp-2">{event.summary}</p>
-                    <p className="font-mono text-[11px] text-we-paper/35">
-                      {FEED_CATEGORY_LABELS[event.category]} · {formatRelativeTime(event.created_at)}
-                    </p>
-                  </div>
-                </li>
-              ))}
+              {recentEvents.map(event => {
+                const userName = event.user?.full_name ?? 'Sistema'
+                return (
+                  <li key={event.id} className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">
+                      {event.user ? (
+                        <MemberAvatar member={event.user} size="sm" title={userName} />
+                      ) : (
+                        <div className="size-7 rounded-full bg-white/[0.06] border border-white/[0.10] flex items-center justify-center">
+                          <span className="size-2 rounded-full bg-we-blue/60" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-body text-sm text-we-paper/80 line-clamp-2">
+                        <span className="font-medium text-we-paper/90">{userName}</span>{' '}
+                        {event.summary}
+                      </p>
+                      <p className="font-mono text-[11px] text-we-paper/35">
+                        {FEED_CATEGORY_LABELS[event.category]} · {formatRelativeTime(event.created_at)}
+                      </p>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>

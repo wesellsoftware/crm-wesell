@@ -22,6 +22,8 @@ export type FeedEventType =
   | 'lead_created_external'
   | 'item_converted'
   | 'item_deleted'
+  | 'item_restored'
+  | 'trash_emptied'
   | 'member_invited'
   | 'member_role_updated'
   | 'member_removed'

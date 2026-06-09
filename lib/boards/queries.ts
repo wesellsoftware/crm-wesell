@@ -44,7 +44,12 @@ export async function getBoardBySlug(slug: string): Promise<BoardData | null> {
   ] = await Promise.all([
     supabase.from('board_groups').select('*').eq('board_id', board.id).order('position'),
     supabase.from('board_columns').select('*').eq('board_id', board.id).order('position'),
-    supabase.from('board_items').select('*').eq('board_id', board.id).order('position'),
+    supabase
+      .from('board_items')
+      .select('*')
+      .eq('board_id', board.id)
+      .is('deleted_at', null)
+      .order('position'),
     supabase.from('profiles').select('id, full_name, avatar_url').eq('organization_id', organizationId),
     supabase.from('boards').select('id, slug, name').eq('organization_id', organizationId).order('position'),
   ])
@@ -78,6 +83,7 @@ export async function getBoardBySlug(slug: string): Promise<BoardData | null> {
       .from('board_items')
       .select('id, name, board:boards(slug)')
       .in('id', Array.from(relatedItemIds))
+      .is('deleted_at', null)
 
     relatedItems = (related ?? []).map(r => ({
       id: r.id,
@@ -116,6 +122,7 @@ export async function getRelationItems(targetBoardSlug: string) {
     .from('board_items')
     .select('id, name')
     .eq('board_id', board.id)
+    .is('deleted_at', null)
     .order('name')
 
   return items ?? []
@@ -159,7 +166,11 @@ export async function getDashboardBoardStats() {
   if (!board) return null
 
   const [{ data: items }, { data: columns }, { data: groups }] = await Promise.all([
-    supabase.from('board_items').select('id, name, group_id').eq('board_id', board.id),
+    supabase
+      .from('board_items')
+      .select('id, name, group_id')
+      .eq('board_id', board.id)
+      .is('deleted_at', null),
     supabase.from('board_columns').select('*').eq('board_id', board.id),
     supabase.from('board_groups').select('*').eq('board_id', board.id).order('position'),
   ])
@@ -238,6 +249,7 @@ export async function getNegociacoesAnalytics(): Promise<NegociacoesAnalytics | 
       .from('board_items')
       .select('id, created_at, closed_at')
       .eq('board_id', board.id)
+      .is('deleted_at', null)
       .not('closed_at', 'is', null),
     supabase.from('board_columns').select('*').eq('board_id', board.id),
   ])

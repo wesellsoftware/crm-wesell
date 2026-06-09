@@ -53,9 +53,12 @@ export function getFeedEventIconType(eventType: FeedEventType): string {
     case 'task_completed':
       return 'field_update'
     case 'item_deleted':
+    case 'trash_emptied':
     case 'stage_deleted':
     case 'webhook_deleted':
       return 'deleted'
+    case 'item_restored':
+      return 'created'
     case 'webhook_toggled':
       return 'webhook'
     case 'member_invited':

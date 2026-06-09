@@ -1,7 +1,9 @@
 'use client'
 
-import { Search, User, Filter, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Search, User, Filter, Plus, Trash2 } from 'lucide-react'
 import { AddColumnDialog } from './add-column-dialog'
+import { BoardTrashSheet } from './board-trash-sheet'
 
 interface BoardToolbarProps {
   slug: string
@@ -10,6 +12,7 @@ interface BoardToolbarProps {
   searchQuery: string
   onSearchChange: (q: string) => void
   onCreateClick?: () => void
+  onItemsRestored?: () => void
 }
 
 export function BoardToolbar({
@@ -19,7 +22,10 @@ export function BoardToolbar({
   searchQuery,
   onSearchChange,
   onCreateClick,
+  onItemsRestored,
 }: BoardToolbarProps) {
+  const [trashOpen, setTrashOpen] = useState(false)
+
   return (
     <div className="flex items-center gap-3 px-6 py-3 border-b border-white/[0.06] shrink-0">
       <button
@@ -51,9 +57,27 @@ export function BoardToolbar({
         Filtro
       </button>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTrashOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-we-paper/55 hover:bg-white/[0.05] hover:text-we-paper/80 transition-colors text-sm font-body border border-transparent hover:border-white/[0.08]"
+          title="Lixeira"
+        >
+          <Trash2 size={14} />
+          Lixeira
+        </button>
         <AddColumnDialog boardId={boardId} slug={slug} />
       </div>
+
+      <BoardTrashSheet
+        boardId={boardId}
+        slug={slug}
+        itemLabel={itemLabel}
+        open={trashOpen}
+        onOpenChange={setTrashOpen}
+        onRestore={onItemsRestored}
+      />
     </div>
   )
 }
