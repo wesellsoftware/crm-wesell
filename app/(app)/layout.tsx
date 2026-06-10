@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
+import { Providers } from "@/components/providers"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .single()
     : { data: null }
   return (
+    <Providers>
     <div
       className="flex h-screen overflow-hidden"
       style={{
@@ -34,5 +36,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <main className="relative flex-1 overflow-y-auto glass-scrollbar">{children}</main>
     </div>
+    </Providers>
   )
 }

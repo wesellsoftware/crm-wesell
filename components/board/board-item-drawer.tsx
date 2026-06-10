@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Trash2 } from 'lucide-react'
 import {
@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { deleteItem } from '@/app/actions/boards'
+import { deleteItem, moveItemToGroup, restoreItem, updateItemName } from '@/app/actions/boards'
 import type {
   BoardColumn,
   BoardGroup,
@@ -19,115 +19,88 @@ import type {
   OrgMember,
   RelatedItem,
 } from '@/lib/boards/types'
-import { getStatusOption } from '@/lib/boards/column-types'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { AvatarGroup } from '@/components/ui/avatar'
-import { MemberAvatar } from './cells/member-avatar'
+import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast-provider'
+import { fireConfettiSideCannons } from '@/lib/confetti-side-cannons'
+import { isWonGroupName } from '@/lib/boards/won-group'
+import { CellRenderer, getItemValue } from './cells/cell-renderer'
+import { CellPopover, cellPopoverOptionClass } from './cells/cell-popover'
+import { DrawerSaveProvider, useDrawerSaveNotify } from './drawer-save-context'
 import { ItemActivityFeed } from './item-activity-feed'
 
-function getItemValue(
-  values: BoardItemValue[],
+function upsertLocalValue(
+  prev: BoardItemValue[],
   itemId: string,
-  columnId: string
-): CellValue | undefined {
-  return values.find(v => v.item_id === itemId && v.column_id === columnId)?.value
+  columnId: string,
+  value: CellValue
+): BoardItemValue[] {
+  const existing = prev.find(v => v.item_id === itemId && v.column_id === columnId)
+  if (existing) {
+    return prev.map(v =>
+      v.item_id === itemId && v.column_id === columnId ? { ...v, value } : v
+    )
+  }
+  return [...prev, { id: crypto.randomUUID(), item_id: itemId, column_id: columnId, value }]
 }
 
-function formatFieldValue(
-  column: BoardColumn,
-  value: CellValue | undefined,
-  members: OrgMember[],
-  relatedItems: RelatedItem[]
-): ReactNode {
-  if (!value) return <span className="text-we-paper/30">—</span>
+function EditableGroupField({
+  groups,
+  groupId,
+  onChange,
+}: {
+  groups: BoardGroup[]
+  groupId: string
+  onChange: (groupId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const group = groups.find(g => g.id === groupId)
 
-  switch (column.type) {
-    case 'text':
-      return (value as { text?: string }).text || '—'
-    case 'status': {
-      const opt = getStatusOption(column.settings, (value as { option_id?: string }).option_id ?? '')
-      if (!opt) return '—'
-      return (
-        <span
-          className="inline-flex px-2.5 py-0.5 rounded-md text-xs font-body text-white"
-          style={{ backgroundColor: opt.color }}
-        >
-          {opt.label}
-        </span>
-      )
-    }
-    case 'person': {
-      const ids = (value as { user_ids?: string[] }).user_ids ?? []
-      const selectedMembers = members.filter(m => ids.includes(m.id))
-      if (!selectedMembers.length) return '—'
-      return (
-        <div className="flex flex-wrap items-center gap-2">
-          <AvatarGroup className="*:data-[slot=avatar]:ring-we-ink/80">
-            {selectedMembers.map(m => (
-              <MemberAvatar key={m.id} member={m} size="sm" title={m.full_name ?? ''} />
-            ))}
-          </AvatarGroup>
-          <span className="text-we-paper/70">
-            {selectedMembers.map(m => m.full_name ?? 'Sem nome').join(', ')}
-          </span>
-        </div>
-      )
-    }
-    case 'date':
-      return formatDate((value as { date?: string }).date ?? '')
-    case 'timeline': {
-      const { start, end } = value as { start?: string; end?: string }
-      if (start && end) return `${formatDate(start)} – ${formatDate(end)}`
-      if (start) return formatDate(start)
-      return '—'
-    }
-    case 'number':
-      return String((value as { number?: number }).number ?? 0)
-    case 'currency':
-      return formatCurrency((value as { amount?: number }).amount ?? 0)
-    case 'email':
-    case 'phone':
-    case 'url':
-      return (value as { value?: string }).value || '—'
-    case 'tags': {
-      const ids = (value as { option_ids?: string[] }).option_ids ?? []
-      const opts = (column.settings.options ?? []).filter(o => ids.includes(o.id))
-      if (!opts.length) return '—'
-      return (
-        <div className="flex flex-wrap gap-1">
-          {opts.map(opt => (
+  return (
+    <div>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="font-body text-xs text-we-paper/40 flex items-center gap-1.5 hover:text-we-paper/60 hover:bg-white/[0.04] rounded px-1 -mx-1 py-0.5 transition-colors"
+      >
+        {group ? (
+          <>
             <span
-              key={opt.id}
-              className="px-2 py-0.5 rounded-md text-[10px] font-body text-white"
-              style={{ backgroundColor: opt.color }}
-            >
-              {opt.label}
-            </span>
-          ))}
-        </div>
-      )
-    }
-    case 'relation': {
-      const ids = (value as { item_ids?: string[] }).item_ids ?? []
-      const items = relatedItems.filter(r => ids.includes(r.id))
-      if (!items.length) return '—'
-      return (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map(r => (
-            <Link
-              key={r.id}
-              href={`/boards/${r.board_slug}`}
-              className="px-2 py-0.5 rounded-md bg-white/[0.08] text-xs font-body text-we-blue hover:bg-white/[0.12] transition-colors"
-            >
-              {r.name}
-            </Link>
-          ))}
-        </div>
-      )
-    }
-    default:
-      return '—'
-  }
+              className="size-2 rounded-full shrink-0"
+              style={{ backgroundColor: group.color }}
+            />
+            {group.name}
+          </>
+        ) : (
+          'Selecionar grupo'
+        )}
+      </button>
+      <CellPopover open={open} onClose={() => setOpen(false)} anchorRef={triggerRef}>
+        {groups.map(g => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => {
+              onChange(g.id)
+              setOpen(false)
+            }}
+            className={cn(
+              cellPopoverOptionClass,
+              'flex items-center gap-2',
+              g.id === groupId ? 'bg-white/[0.08] text-we-paper' : 'text-we-paper/70 hover:bg-white/[0.06]'
+            )}
+          >
+            <span
+              className="size-2 rounded-full shrink-0"
+              style={{ backgroundColor: g.color }}
+            />
+            {g.name}
+          </button>
+        ))}
+      </CellPopover>
+    </div>
+  )
 }
 
 interface BoardItemDrawerProps {
@@ -142,9 +115,29 @@ interface BoardItemDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onDeleted?: (itemId: string) => void
+  onRestored?: (item: BoardItem) => void
+  onValueUpdate?: (itemId: string, columnId: string, value: CellValue) => void
+  onItemUpdate?: (itemId: string, updates: Partial<BoardItem>) => void
 }
 
-export function BoardItemDrawer({
+export function BoardItemDrawer(props: BoardItemDrawerProps) {
+  if (!props.item) return null
+
+  return (
+    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+      <SheetContent
+        side="right"
+        className="glass-modal w-[40vw] max-w-[40vw] border-l border-white/[0.08] bg-we-ink/95 p-0 flex flex-col gap-0 text-we-paper"
+      >
+        <DrawerSaveProvider>
+          <BoardItemDrawerContent {...props} item={props.item} />
+        </DrawerSaveProvider>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function BoardItemDrawerContent({
   item,
   slug,
   columns,
@@ -156,29 +149,84 @@ export function BoardItemDrawer({
   open,
   onOpenChange,
   onDeleted,
-}: BoardItemDrawerProps) {
+  onRestored,
+  onValueUpdate,
+  onItemUpdate,
+}: BoardItemDrawerProps & { item: BoardItem }) {
+  const notifySaved = useDrawerSaveNotify()
+  const { showToast } = useToast()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [localValues, setLocalValues] = useState<BoardItemValue[]>(values)
+  const [localItem, setLocalItem] = useState<BoardItem | null>(item)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
   const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setLocalValues(values)
+  }, [values])
+
+  useEffect(() => {
+    setLocalItem(item)
+    setEditingName(false)
+    setNameDraft(item?.name ?? '')
+  }, [item?.id, item?.name, open])
 
   useEffect(() => {
     setConfirmDelete(false)
     setDeleteError(null)
-  }, [item?.id, open])
+  }, [item.id, open])
 
-  if (!item) return null
+  if (!localItem) return null
 
-  const itemId = item.id
-
-  const group = groups.find(g => g.id === item.group_id)
+  const itemId = localItem.id
   const displayColumns = columns.filter(c => !c.is_primary)
   const relatedNames = Object.fromEntries(relatedItems.map(r => [r.id, r.name]))
-  const createdBy = item.created_by
-    ? members.find(m => m.id === item.created_by) ?? null
+  const createdBy = localItem.created_by
+    ? members.find(m => m.id === localItem.created_by) ?? null
     : null
+  const resolvedValues = localValues.length ? localValues : values
+
+  function handleValueUpdate(updatedItemId: string, columnId: string, value: CellValue) {
+    setLocalValues(prev => upsertLocalValue(prev, updatedItemId, columnId, value))
+    onValueUpdate?.(updatedItemId, columnId, value)
+  }
+
+  function handleNameSave(viaEnter = false) {
+    if (!localItem) return
+    setEditingName(false)
+    const name = nameDraft.trim()
+    if (!name || name === localItem.name) {
+      setNameDraft(localItem.name)
+      if (viaEnter) notifySaved?.()
+      return
+    }
+    setLocalItem(prev => (prev ? { ...prev, name } : prev))
+    onItemUpdate?.(itemId, { name })
+    startTransition(() => { void updateItemName(itemId, name, slug) })
+    if (viaEnter) notifySaved?.()
+  }
+
+  function handleGroupChange(groupId: string) {
+    if (!localItem || groupId === localItem.group_id) return
+
+    const targetGroup = groups.find(g => g.id === groupId)
+    const wasInWon = groups.some(
+      g => g.id === localItem.group_id && isWonGroupName(g.name)
+    )
+    if (targetGroup && isWonGroupName(targetGroup.name) && !wasInWon) {
+      fireConfettiSideCannons()
+    }
+
+    setLocalItem(prev => (prev ? { ...prev, group_id: groupId } : prev))
+    onItemUpdate?.(itemId, { group_id: groupId })
+    startTransition(() => { void moveItemToGroup(itemId, groupId, slug) })
+  }
 
   function handleDelete() {
     setDeleteError(null)
+    const deletedItem = { ...localItem }
     startTransition(async () => {
       const result = await deleteItem(itemId, slug)
       if (result.error) {
@@ -188,27 +236,57 @@ export function BoardItemDrawer({
       onDeleted?.(itemId)
       setConfirmDelete(false)
       onOpenChange(false)
+      showToast({
+        message: `"${deletedItem.name}" excluído`,
+        action: {
+          label: 'Desfazer',
+          onClick: async () => {
+            const restoreResult = await restoreItem(deletedItem.id, slug)
+            if (restoreResult.error) return
+            onRestored?.(deletedItem)
+          },
+        },
+      })
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="glass-modal w-full sm:max-w-[39.6rem] border-l border-white/[0.08] bg-we-ink/95 p-0 flex flex-col gap-0 text-we-paper"
-      >
+    <>
         <SheetHeader className="px-5 pt-5 pb-4 border-b border-white/[0.06] shrink-0">
-          <SheetTitle className="font-display text-xl text-we-paper pr-8">
-            {item.name}
-          </SheetTitle>
-          {group && (
-            <p className="font-body text-xs text-we-paper/40 flex items-center gap-1.5">
-              <span
-                className="size-2 rounded-full shrink-0"
-                style={{ backgroundColor: group.color }}
-              />
-              {group.name}
-            </p>
+          <SheetTitle className="sr-only">{localItem.name}</SheetTitle>
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onBlur={() => handleNameSave()}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleNameSave(true)
+                if (e.key === 'Escape') {
+                  setNameDraft(localItem.name)
+                  setEditingName(false)
+                }
+              }}
+              className="w-full glass-input rounded px-2 py-1.5 outline-none font-display text-xl text-we-paper font-medium focus:ring-1 focus:ring-we-blue/40 pr-8"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setNameDraft(localItem.name)
+                setEditingName(true)
+              }}
+              className="font-display text-xl text-we-paper text-left w-full pr-8 rounded px-1 -mx-1 py-0.5 hover:bg-white/[0.05] transition-colors"
+            >
+              {localItem.name}
+            </button>
+          )}
+          {groups.length > 0 && (
+            <EditableGroupField
+              groups={groups}
+              groupId={localItem.group_id}
+              onChange={handleGroupChange}
+            />
           )}
         </SheetHeader>
 
@@ -219,18 +297,24 @@ export function BoardItemDrawer({
               {displayColumns.map(col => (
                 <div
                   key={col.id}
-                  className="flex flex-col gap-1 py-2 border-b border-white/[0.06] last:border-0"
+                  className="flex flex-col gap-1.5 py-2 border-b border-white/[0.06] last:border-0"
                 >
                   <span className="font-body text-xs text-we-paper/45 uppercase tracking-wide">
                     {col.name}
                   </span>
-                  <div className="font-body text-sm text-we-paper/85">
-                    {formatFieldValue(
-                      col,
-                      getItemValue(values, item.id, col.id),
-                      members,
-                      relatedItems
-                    )}
+                  <div
+                    className="font-body text-sm text-we-paper/85 min-h-[28px]"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <CellRenderer
+                      column={col}
+                      itemId={itemId}
+                      value={getItemValue(resolvedValues, itemId, col.id)}
+                      slug={slug}
+                      members={members}
+                      relatedItems={relatedItems}
+                      onUpdate={handleValueUpdate}
+                    />
                   </div>
                 </div>
               ))}
@@ -240,7 +324,7 @@ export function BoardItemDrawer({
                   Criado em
                 </span>
                 <span className="font-mono text-xs text-we-paper/50">
-                  {new Date(item.created_at).toLocaleDateString('pt-BR', {
+                  {new Date(localItem.created_at).toLocaleDateString('pt-BR', {
                     day: '2-digit',
                     month: 'long',
                     year: 'numeric',
@@ -263,7 +347,7 @@ export function BoardItemDrawer({
 
           <section className="border-t border-white/[0.06] pt-4">
             <ItemActivityFeed
-              item={item}
+              item={localItem}
               slug={slug}
               columns={columns}
               members={members}
@@ -277,7 +361,7 @@ export function BoardItemDrawer({
             {confirmDelete ? (
               <div className="rounded-lg border border-we-red/20 bg-we-red/5 p-4 space-y-3">
                 <p className="font-body text-sm text-we-paper/80">
-                  Mover <span className="font-medium text-we-paper">{item.name}</span> para a lixeira?
+                  Mover <span className="font-medium text-we-paper">{localItem.name}</span> para a lixeira?
                 </p>
                 <p className="font-body text-xs text-we-paper/45">
                   Você poderá restaurar este item na lixeira do board.
@@ -316,8 +400,7 @@ export function BoardItemDrawer({
             )}
           </section>
         </div>
-      </SheetContent>
-    </Sheet>
+    </>
   )
 }
 

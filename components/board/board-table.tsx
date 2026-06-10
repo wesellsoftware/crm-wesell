@@ -335,6 +335,13 @@ export function BoardTable({
     setSelectedItem(null)
   }
 
+  function handleItemRestored(item: BoardItem) {
+    setLocalItems(prev => {
+      if (prev.some(i => i.id === item.id)) return prev
+      return [...prev, item].sort((a, b) => a.position - b.position)
+    })
+  }
+
   function handleValueUpdate(itemId: string, columnId: string, value: CellValue) {
     setLocalValues(prev => {
       const existing = prev.find(v => v.item_id === itemId && v.column_id === columnId)
@@ -347,6 +354,15 @@ export function BoardTable({
       }
       return [...prev, { id: crypto.randomUUID(), item_id: itemId, column_id: columnId, value }]
     })
+  }
+
+  function handleItemUpdate(itemId: string, updates: Partial<BoardItem>) {
+    setLocalItems(prev =>
+      prev.map(item => (item.id === itemId ? { ...item, ...updates } : item))
+    )
+    setSelectedItem(prev =>
+      prev?.id === itemId ? { ...prev, ...updates } : prev
+    )
   }
 
   return (
@@ -407,6 +423,9 @@ export function BoardTable({
         open={selectedItem !== null}
         onOpenChange={open => { if (!open) setSelectedItem(null) }}
         onDeleted={handleItemDeleted}
+        onRestored={handleItemRestored}
+        onValueUpdate={handleValueUpdate}
+        onItemUpdate={handleItemUpdate}
       />
     </div>
   )

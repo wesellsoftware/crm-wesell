@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerSaveNotify } from '../drawer-save-context'
 
 interface NumberCellProps {
   value: number
@@ -8,6 +9,7 @@ interface NumberCellProps {
 }
 
 export function NumberCell({ value, onChange }: NumberCellProps) {
+  const notifySaved = useDrawerSaveNotify()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(value || ''))
 
@@ -25,7 +27,14 @@ export function NumberCell({ value, onChange }: NumberCellProps) {
           const num = Number(draft) || 0
           if (num !== value) onChange(num)
         }}
-        onKeyDown={e => e.key === 'Enter' && (setEditing(false), onChange(Number(draft) || 0))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            setEditing(false)
+            const num = Number(draft) || 0
+            if (num !== value) onChange(num)
+            notifySaved?.()
+          }
+        }}
         className="w-12 bg-transparent border-none outline-none font-mono text-xs text-we-paper/80 text-center"
       />
     )

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useDrawerSaveNotify } from '../drawer-save-context'
 
 interface CurrencyCellProps {
   value: number
@@ -10,6 +11,7 @@ interface CurrencyCellProps {
 }
 
 export function CurrencyCell({ value, onChange }: CurrencyCellProps) {
+  const notifySaved = useDrawerSaveNotify()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(value || ''))
 
@@ -30,6 +32,7 @@ export function CurrencyCell({ value, onChange }: CurrencyCellProps) {
             setEditing(false)
             const num = Number(draft) || 0
             if (num !== value) onChange(num)
+            notifySaved?.()
           }
         }}
         className="w-full glass-input rounded px-2 py-1 outline-none font-mono text-xs text-we-paper/80"

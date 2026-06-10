@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDrawerSaveNotify } from '../drawer-save-context'
 
 interface UrlCellProps {
   value: string
@@ -8,6 +9,7 @@ interface UrlCellProps {
 }
 
 export function UrlCell({ value, onChange }: UrlCellProps) {
+  const notifySaved = useDrawerSaveNotify()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
@@ -19,7 +21,13 @@ export function UrlCell({ value, onChange }: UrlCellProps) {
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => { setEditing(false); if (draft !== value) onChange(draft) }}
-        onKeyDown={e => e.key === 'Enter' && (setEditing(false), onChange(draft))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            setEditing(false)
+            if (draft !== value) onChange(draft)
+            notifySaved?.()
+          }
+        }}
         className="w-full glass-input rounded px-2 py-1 outline-none font-mono text-xs text-we-blue"
       />
     )

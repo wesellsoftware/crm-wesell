@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useDrawerSaveNotify } from '../drawer-save-context'
 
 interface TextCellProps {
   value: string
@@ -9,6 +10,7 @@ interface TextCellProps {
 }
 
 export function TextCell({ value, onChange }: TextCellProps) {
+  const notifySaved = useDrawerSaveNotify()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
 
@@ -26,6 +28,7 @@ export function TextCell({ value, onChange }: TextCellProps) {
           if (e.key === 'Enter') {
             setEditing(false)
             if (draft !== value) onChange(draft)
+            notifySaved?.()
           }
           if (e.key === 'Escape') {
             setDraft(value)

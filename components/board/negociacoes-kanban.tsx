@@ -24,6 +24,7 @@ import type {
   BoardGroup,
   BoardItem,
   BoardItemValue,
+  CellValue,
   OrgMember,
   RelatedItem,
 } from '@/lib/boards/types'
@@ -218,12 +219,22 @@ export function NegociacoesKanban({
   const [, startTransition] = useTransition()
   const [localItemsByGroup, setLocalItemsByGroup] = useState(itemsByGroup)
   const [localGroups, setLocalGroups] = useState(groups)
+  const [localValues, setLocalValues] = useState(values)
   const didDragRef = useRef(false)
 
   useEffect(() => {
     setLocalGroups(groups)
     setLocalItemsByGroup(itemsByGroup)
-  }, [groups, itemsByGroup])
+    setLocalValues(values)
+  }, [groups, itemsByGroup, values])
+
+  useEffect(() => {
+    setSelectedItem(prev => {
+      if (!prev) return null
+      const updated = Object.values(localItemsByGroup).flat().find(i => i.id === prev.id)
+      return updated ?? prev
+    })
+  }, [localItemsByGroup])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -273,6 +284,52 @@ export function NegociacoesKanban({
       return next
     })
     setSelectedItem(null)
+  }
+
+  function handleItemRestored(item: BoardItem) {
+    setLocalItemsByGroup(prev => {
+      const groupId = item.group_id
+      const groupItems = prev[groupId] ?? []
+      if (groupItems.some(i => i.id === item.id)) return prev
+      return {
+        ...prev,
+        [groupId]: [...groupItems, item].sort((a, b) => a.position - b.position),
+      }
+    })
+  }
+
+  function handleValueUpdate(itemId: string, columnId: string, value: CellValue) {
+    setLocalValues(prev => {
+      const existing = prev.find(v => v.item_id === itemId && v.column_id === columnId)
+      if (existing) {
+        return prev.map(v =>
+          v.item_id === itemId && v.column_id === columnId ? { ...v, value } : v
+        )
+      }
+      return [...prev, { id: crypto.randomUUID(), item_id: itemId, column_id: columnId, value }]
+    })
+  }
+
+  function handleItemUpdate(itemId: string, updates: Partial<BoardItem>) {
+    setLocalItemsByGroup(prev => {
+      const next: Record<string, BoardItem[]> = {}
+      for (const [groupId, groupItems] of Object.entries(prev)) {
+        next[groupId] = groupItems.map(item =>
+          item.id === itemId ? { ...item, ...updates } : item
+        )
+      }
+      if (updates.group_id) {
+        const item = Object.values(next).flat().find(i => i.id === itemId)
+        if (item) {
+          for (const groupId of Object.keys(next)) {
+            next[groupId] = next[groupId].filter(i => i.id !== itemId)
+          }
+          next[updates.group_id] = [...(next[updates.group_id] ?? []), item]
+        }
+      }
+      return next
+    })
+    setSelectedItem(prev => (prev?.id === itemId ? { ...prev, ...updates } : prev))
   }
 
   const activeItem = activeId
@@ -368,7 +425,7 @@ export function NegociacoesKanban({
         item={selectedItem}
         slug="negociacoes"
         columns={columns}
-        values={values}
+        values={localValues.length ? localValues : values}
         members={members}
         relatedItems={relatedItems}
         groups={localGroups}
@@ -376,6 +433,9 @@ export function NegociacoesKanban({
         open={selectedItem !== null}
         onOpenChange={open => { if (!open) setSelectedItem(null) }}
         onDeleted={handleItemDeleted}
+        onRestored={handleItemRestored}
+        onValueUpdate={handleValueUpdate}
+        onItemUpdate={handleItemUpdate}
       />
 
       <BoardTrashSheet
