@@ -1,8 +1,9 @@
 'use client'
 
 import { useActionState, useState, useTransition } from 'react'
-import { inviteMember, removeMember, updateMemberRole } from '@/app/actions/members'
-import { Check, Shield, ShieldOff, Trash2, UserPlus } from 'lucide-react'
+import { inviteMember, removeMember, resendInviteMember, updateMemberRole } from '@/app/actions/members'
+import type { MemberPlatformStatus } from '@/lib/auth/invite'
+import { Check, Mail, Shield, ShieldOff, Trash2, UserPlus } from 'lucide-react'
 
 interface MemberRow {
   id: string
@@ -13,6 +14,8 @@ interface MemberRow {
 
 interface MembersManagerProps {
   members: MemberRow[]
+  platformStatusByMemberId: Record<string, MemberPlatformStatus>
+  statusUnavailable?: boolean
   isAdmin: boolean
   currentUserId: string
 }
@@ -37,22 +40,65 @@ function roleBadge(role: string) {
   )
 }
 
-export function MembersManager({ members, isAdmin, currentUserId }: MembersManagerProps) {
+function platformStatusBadge(status: MemberPlatformStatus) {
+  if (status === 'pending') {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-we-yellow/15 text-we-yellow border border-we-yellow/25">
+        <span className="size-1.5 rounded-full bg-we-yellow" aria-hidden />
+        Convite pendente
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-we-green/15 text-we-green border border-we-green/25">
+      <span className="size-1.5 rounded-full bg-we-green" aria-hidden />
+      Ativo
+    </span>
+  )
+}
+
+export function MembersManager({
+  members,
+  platformStatusByMemberId,
+  statusUnavailable = false,
+  isAdmin,
+  currentUserId,
+}: MembersManagerProps) {
   const [inviteState, inviteAction, invitePending] = useActionState(inviteMember, undefined)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   function handleRoleChange(memberId: string, role: 'admin' | 'member') {
     setActionError(null)
+    setActionSuccess(null)
     startTransition(async () => {
       const result = await updateMemberRole(memberId, role)
       if (result.error) setActionError(result.error)
     })
   }
 
+  function handleResendInvite(memberId: string, name: string) {
+    setActionError(null)
+    setActionSuccess(null)
+    setResendingId(memberId)
+    startTransition(async () => {
+      const result = await resendInviteMember(memberId)
+      setResendingId(null)
+      if (result.error) {
+        setActionError(result.error)
+        return
+      }
+      setActionSuccess(`Novo convite enviado para ${name}.`)
+    })
+  }
+
   function handleRemove(memberId: string, name: string) {
     if (!confirm(`Remover ${name} da organização?`)) return
     setActionError(null)
+    setActionSuccess(null)
     startTransition(async () => {
       const result = await removeMember(memberId)
       if (result.error) setActionError(result.error)
@@ -113,8 +159,20 @@ export function MembersManager({ members, isAdmin, currentUserId }: MembersManag
         </form>
       )}
 
+      {statusUnavailable && (
+        <p className="font-body text-xs text-we-yellow/80">
+          Não foi possível carregar o status dos colaboradores. Verifique se `SUPABASE_SERVICE_ROLE_KEY` está configurada.
+        </p>
+      )}
+
       {actionError && (
         <p className="font-body text-sm text-we-red">{actionError}</p>
+      )}
+      {actionSuccess && (
+        <div className="flex items-center gap-2 text-we-green">
+          <Check size={14} />
+          <p className="font-body text-sm">{actionSuccess}</p>
+        </div>
       )}
 
       <div className="space-y-2">
@@ -122,11 +180,16 @@ export function MembersManager({ members, isAdmin, currentUserId }: MembersManag
           const isSelf = m.id === currentUserId
           const isLastAdmin = m.role === 'admin' && adminCount <= 1
           const name = m.full_name ?? 'Sem nome'
+          const isCollaborator = m.role === 'member'
+          const platformStatus = isCollaborator
+            ? (platformStatusByMemberId[m.id] ?? 'pending')
+            : 'active'
+          const isResending = resendingId === m.id
 
           return (
             <div
               key={m.id}
-              className="flex items-center justify-between gap-3 py-2 border-b border-white/[0.06] last:border-0"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 border-b border-white/[0.06] last:border-0"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="size-8 rounded-full bg-we-blue/20 flex items-center justify-center shrink-0">
@@ -144,11 +207,23 @@ export function MembersManager({ members, isAdmin, currentUserId }: MembersManag
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end pl-11 sm:pl-0">
                 {roleBadge(m.role)}
+                {isCollaborator && platformStatusBadge(platformStatus)}
 
                 {isAdmin && !isSelf && (
                   <div className="flex items-center gap-1">
+                    {isCollaborator && (
+                      <button
+                        type="button"
+                        disabled={pending || isResending}
+                        onClick={() => handleResendInvite(m.id, name)}
+                        title="Reenviar convite por e-mail"
+                        className="size-8 rounded-[8px] flex items-center justify-center text-we-paper/40 hover:text-we-lime hover:bg-we-lime/10 transition-colors disabled:opacity-50"
+                      >
+                        <Mail size={14} strokeWidth={2} />
+                      </button>
+                    )}
                     {m.role === 'member' && (
                       <button
                         type="button"

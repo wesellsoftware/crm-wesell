@@ -67,7 +67,7 @@ export async function forgotPassword(_: unknown, formData: FormData) {
 
   const { error } = await supabase.auth.resetPasswordForEmail(
     formData.get('email') as string,
-    { redirectTo: `${origin}/auth/callback?next=/nova-senha` }
+    { redirectTo: `${origin}/auth/callback` }
   )
 
   if (error) return { error: error.message }
@@ -101,7 +101,7 @@ export async function completeInvite(_: unknown, formData: FormData) {
 
   const { error: passwordError } = await supabase.auth.updateUser({
     password,
-    data: { full_name: fullName },
+    data: { full_name: fullName, invite_completed: true },
   })
 
   if (passwordError) return { error: passwordError.message }

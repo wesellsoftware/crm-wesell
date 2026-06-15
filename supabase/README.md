@@ -18,6 +18,7 @@ Migrations applied:
 3. `010_webhooks_and_lead_form_columns.sql` — webhooks n8n + colunas do formulário de leads
 4. `011_organization_feed_events.sql` — feed global de atividades do CRM (`organization_feed_events`)
 5. `012_invite_members.sql` — convite de colaboradores ao espaço existente (`handle_new_user` join por `organization_id`)
+6. `013_ensure_auth_user_trigger.sql` — trigger `on_auth_user_created` em `auth.users`
 
 ## Integrações (API + Webhooks)
 
@@ -60,14 +61,21 @@ NEXT_PUBLIC_SITE_URL=https://crm.wesellsoftware.com.br   # produção (VPS)
 
 | Campo | Valor |
 |-------|-------|
-| Site URL | `https://crm.wesellsoftware.com.br` |
+| Site URL | `https://crm.wesellsoftware.com.br` (raiz do domínio, **sem** `/login`) |
 | Redirect URLs | `https://crm.wesellsoftware.com.br/auth/callback` |
+| | `https://crm.wesellsoftware.com.br/auth/confirm` |
 | | `https://crm.wesellsoftware.com.br/**` (wildcard, se disponível) |
 | | `http://localhost:3000/auth/callback` (dev local) |
 
-Recuperação de senha redireciona para `/auth/callback?next=/nova-senha`.
+**Importante:** use `redirectTo` apenas como `/auth/callback` (sem query string). O app detecta convites pendentes pelo metadata do usuário.
 
-O convite redireciona para `/auth/callback?next=/convite` — tela dedicada de criar conta vinculada à organização (diferente de `/signup`).
+**OTP / link expirado (`otp_expired`):** em Authentication → Providers → Email, aumente o tempo de expiração do OTP se necessário. Links de convite são de uso único — se expirarem, o admin deve reenviar em Configurações → Membros (botão de reenviar convite).
+
+Recuperação de senha e convites passam por `/auth/callback` (com `type=recovery` para reset de senha).
+
+**Migrations obrigatórias para convites:**
+- `012_invite_members.sql` — branch de convite no `handle_new_user`
+- `013_ensure_auth_user_trigger.sql` — garante trigger `on_auth_user_created` no `auth.users`
 
 **Limitação v1:** convite só funciona para e-mails **sem conta** no CRM. Se a pessoa já se cadastrou, o admin verá erro ao convidar.
 

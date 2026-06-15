@@ -7,7 +7,7 @@ export default async function Home({
 }) {
   const { code } = await searchParams
   if (code) {
-    redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=/nova-senha`)
+    redirect(`/auth/callback?code=${encodeURIComponent(code)}`)
   }
   redirect("/login")
 }

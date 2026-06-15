@@ -3,8 +3,10 @@
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, Eye, EyeOff, MailWarning } from "lucide-react"
-import { useActionState, useState } from "react"
+import { Suspense, useActionState, useState } from "react"
 import { login, resendVerification } from "@/app/actions/auth"
+import { AuthHashRedirect } from "@/components/auth/auth-hash-redirect"
+import { AuthLinkNotice } from "@/components/auth/auth-link-notice"
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
@@ -12,6 +14,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   return (
+  <>
+    <AuthHashRedirect />
     <div
       className="min-h-screen flex relative overflow-hidden"
       style={{ background: "linear-gradient(135deg, #1a1626 0%, #2F2935 45%, #1e1b2e 100%)" }}
@@ -71,6 +75,10 @@ export default function LoginPage() {
             <h2 className="font-display text-4xl text-we-ink">Entrar</h2>
             <p className="font-body text-we-ink/55 mt-1">Acesse sua conta WeSell</p>
           </div>
+
+          <Suspense fallback={null}>
+            <AuthLinkNotice />
+          </Suspense>
 
           {state?.type === 'unverified' && (
             <div className="mb-5 px-4 py-3 rounded-[8px] bg-we-yellow/15 border border-we-yellow/40 space-y-2">
@@ -176,15 +184,9 @@ export default function LoginPage() {
               {!pending && <ArrowRight size={16} />}
             </button>
           </form>
-
-          <p className="mt-8 text-center text-sm font-body text-we-ink/55">
-            Novo por aqui?{" "}
-            <Link href="/signup" className="text-we-blue hover:underline font-semibold">
-              Criar conta
-            </Link>
-          </p>
         </div>
       </main>
     </div>
+  </>
   )
 }

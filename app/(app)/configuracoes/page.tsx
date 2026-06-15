@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getMembersPlatformStatus } from '@/app/actions/members'
 import { ProfileForm } from '@/components/configuracoes/profile-form'
 import { OrgForm } from '@/components/configuracoes/org-form'
 import { PageTitle } from '@/components/page-title'
@@ -28,6 +29,12 @@ export default async function ConfiguracoesPage() {
   const apiEndpoint = host ? `${protocol}://${host}/api/leads` : '/api/leads'
 
   const isAdmin = profile?.role === 'admin'
+  const memberList = members ?? []
+  const collaboratorIds = memberList.filter(m => m.role === 'member').map(m => m.id)
+  const platformStatusByMemberId = isAdmin
+    ? await getMembersPlatformStatus(collaboratorIds)
+    : {}
+  const statusUnavailable = isAdmin && collaboratorIds.length > 0 && Object.keys(platformStatusByMemberId).length === 0
 
   return (
     <div className="p-8 space-y-8 max-w-3xl">
@@ -51,7 +58,9 @@ export default async function ConfiguracoesPage() {
       <section className="glass rounded-xl p-6 space-y-4">
         <h2 className="font-body text-base font-semibold text-we-paper/70">Membros</h2>
         <MembersManager
-          members={members ?? []}
+          members={memberList}
+          platformStatusByMemberId={platformStatusByMemberId}
+          statusUnavailable={statusUnavailable}
           isAdmin={isAdmin}
           currentUserId={user?.id ?? ''}
         />

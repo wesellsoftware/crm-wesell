@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isPendingInvite } from '@/lib/auth/invite'
 
 export async function proxy(req: NextRequest) {
   let supabaseResponse = NextResponse.next({ request: req })
@@ -30,14 +31,18 @@ export async function proxy(req: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = req.nextUrl.pathname
-  const isPublicPath = ['/', '/login', '/signup', '/recuperar-senha', '/convite', '/nova-senha'].includes(path) ||
+  const isPublicPath = ['/', '/login', '/recuperar-senha', '/convite', '/nova-senha'].includes(path) ||
     path.startsWith('/auth/')
 
   if (!user && !isPublicPath) {
     return NextResponse.redirect(new URL('/login', req.nextUrl))
   }
 
-  if (user && (path === '/login' || path === '/signup' || path === '/')) {
+  if (user && isPendingInvite(user) && path !== '/convite' && !path.startsWith('/auth/')) {
+    return NextResponse.redirect(new URL('/convite', req.nextUrl))
+  }
+
+  if (user && (path === '/login' || path === '/')) {
     return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
   }
 
