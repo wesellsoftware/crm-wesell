@@ -225,6 +225,7 @@ function BoardItemDrawerContent({
   }
 
   function handleDelete() {
+    if (!localItem) return
     setDeleteError(null)
     const deletedItem = { ...localItem }
     startTransition(async () => {
@@ -241,7 +242,7 @@ function BoardItemDrawerContent({
         action: {
           label: 'Desfazer',
           onClick: async () => {
-            const restoreResult = await restoreItem(deletedItem.id, slug)
+            const restoreResult = await restoreItem(itemId, slug)
             if (restoreResult.error) return
             onRestored?.(deletedItem)
           },
