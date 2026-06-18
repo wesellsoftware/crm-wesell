@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getAppOrigin } from '@/lib/app-url'
+import { getAuthRedirectOrigin } from '@/lib/app-url'
 import { createClient } from '@/lib/supabase/server'
 import { type MemberPlatformStatus, getMemberPlatformStatus } from '@/lib/auth/invite'
 import { ADMIN_CREDENTIALS_ERROR, createAdminClient, tryCreateAdminClient } from '@/lib/supabase/admin'
@@ -157,7 +157,7 @@ export async function inviteMember(
   if (!email) return { error: 'Informe o e-mail.' }
   if (!fullName) return { error: 'Informe o nome.' }
 
-  const origin = await getAppOrigin()
+  const origin = await getAuthRedirectOrigin()
 
   const admin = tryCreateAdminClient()
   if (!admin) return { error: ADMIN_CREDENTIALS_ERROR }
@@ -220,7 +220,7 @@ export async function resendInviteMember(
     return { error: 'Não foi possível localizar o e-mail do convidado.' }
   }
 
-  const origin = await getAppOrigin()
+  const origin = await getAuthRedirectOrigin()
   const email = authUser.user.email
   const fullName = member.full_name ?? (authUser.user.user_metadata?.full_name as string) ?? email.split('@')[0]
 

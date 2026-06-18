@@ -33,3 +33,13 @@ export async function getAppOrigin(): Promise<string> {
 
   return 'http://localhost:3000'
 }
+
+/** Origin for auth e-mail links (reset password, invites). Never relies on NEXT_PUBLIC_* in production. */
+export async function getAuthRedirectOrigin(): Promise<string> {
+  const siteUrl = process.env.SITE_URL?.replace(/\/$/, '')
+  if (siteUrl) return siteUrl
+
+  if (process.env.NODE_ENV === 'production') return PRODUCTION_ORIGIN
+
+  return getAppOrigin()
+}

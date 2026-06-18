@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { getAppOrigin } from '@/lib/app-url'
+import { getAuthRedirectOrigin } from '@/lib/app-url'
 import { createClient } from '@/lib/supabase/server'
 
 export async function login(_: unknown, formData: FormData) {
@@ -63,7 +63,7 @@ export async function logout() {
 
 export async function forgotPassword(_: unknown, formData: FormData) {
   const supabase = await createClient()
-  const origin = await getAppOrigin()
+  const origin = await getAuthRedirectOrigin()
 
   const { error } = await supabase.auth.resetPasswordForEmail(
     formData.get('email') as string,
