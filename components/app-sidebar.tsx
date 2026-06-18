@@ -12,6 +12,7 @@ import {
   BarChart2,
   Settings,
   LogOut,
+  Landmark,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logout } from "@/app/actions/auth"
@@ -30,11 +31,12 @@ const navItems = [
 type AppSidebarProps = {
   avatarUrl: string | null
   fullName: string
+  isAdmin: boolean
 }
 
 const DASHBOARD_HREF = "/dashboard"
 
-export function AppSidebar({ avatarUrl, fullName }: AppSidebarProps) {
+export function AppSidebar({ avatarUrl, fullName, isAdmin }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -80,6 +82,24 @@ export function AppSidebar({ avatarUrl, fullName }: AppSidebarProps) {
             </Link>
           )
         })}
+
+        {isAdmin && (
+          <>
+            <div className="mx-3 my-2 h-px bg-white/[0.06]" />
+            <Link
+              href="/financeiro/dashboard"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-[8px] text-sm font-body transition-colors",
+                pathname.startsWith("/financeiro")
+                  ? "bg-we-blue/80 text-white shadow-sm backdrop-blur-sm"
+                  : "text-we-paper/55 hover:bg-white/[0.07] hover:text-we-paper"
+              )}
+            >
+              <Landmark size={16} />
+              <span>Financeiro</span>
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="px-3 py-4 border-t border-white/[0.07]">

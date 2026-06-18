@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("avatar_url, full_name")
+        .select("avatar_url, full_name, role")
         .eq("id", user.id)
         .single()
     : { data: null }
@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppSidebar
         avatarUrl={profile?.avatar_url ?? null}
         fullName={profile?.full_name ?? ""}
+        isAdmin={profile?.role === "admin"}
       />
       <main className="relative flex-1 overflow-y-auto glass-scrollbar">{children}</main>
     </div>
