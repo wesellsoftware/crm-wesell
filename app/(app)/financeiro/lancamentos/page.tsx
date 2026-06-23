@@ -5,7 +5,6 @@ import {
   getFinCategories,
   getFinAccountsForSelect,
   getFinClientsForSelect,
-  getFinProjectsForSelect,
 } from '@/lib/financeiro/queries'
 
 type SearchParams = {
@@ -24,13 +23,12 @@ export default async function LancamentosPage({
     ? (params.status as 'pendente' | 'atrasado' | 'pago')
     : undefined
 
-  const [receitas, despesas, categories, banks, clients, projects] = await Promise.all([
+  const [receitas, despesas, categories, banks, clients] = await Promise.all([
     getFinTransactions({ type: 'receita' }),
     getFinTransactions({ type: 'despesa' }),
     getFinCategories(),
     getFinAccountsForSelect(),
     getFinClientsForSelect(),
-    getFinProjectsForSelect(),
   ])
 
   return (
@@ -50,7 +48,6 @@ export default async function LancamentosPage({
           categories={categories}
           banks={banks}
           clients={clients}
-          projects={projects}
           initialStatus={initialStatus}
         />
       ) : (
@@ -60,7 +57,6 @@ export default async function LancamentosPage({
           categories={categories}
           banks={banks}
           clients={clients}
-          projects={projects}
           initialStatus={initialStatus}
         />
       )}

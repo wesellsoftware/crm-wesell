@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { addMonth } from '@/lib/financeiro/period'
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -12,12 +13,6 @@ const MONTHS = [
 type Props = {
   period: string // YYYY-MM
   regime: 'caixa' | 'competencia'
-}
-
-function addMonth(period: string, delta: number): string {
-  const [y, m] = period.split('-').map(Number)
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 export function FinDrePeriodSelector({ period, regime }: Props) {

@@ -67,7 +67,6 @@ export async function createTransaction(_: unknown, formData: FormData) {
   const paidDate = (formData.get('paid_date') as string) || null
   const categoryId = (formData.get('category_id') as string) || null
   const clientId = (formData.get('client_id') as string) || null
-  const projectId = (formData.get('project_id') as string) || null
   const accountId = (formData.get('account_id') as string) || null
   const paymentMethod = parsePaymentMethod(formData.get('payment_method'))
 
@@ -92,7 +91,7 @@ export async function createTransaction(_: unknown, formData: FormData) {
     account_id: resolvedAccountId,
     category_id: categoryId || null,
     client_id: clientId || null,
-    project_id: projectId || null,
+    project_id: null,
     payment_method: paymentMethod,
   })
 
@@ -110,7 +109,6 @@ export async function createInstallments(_: unknown, formData: FormData) {
   const dueDate = formData.get('due_date') as string
   const categoryId = (formData.get('category_id') as string) || null
   const clientId = (formData.get('client_id') as string) || null
-  const projectId = (formData.get('project_id') as string) || null
   const accountId = (formData.get('account_id') as string) || null
   const installmentsRaw = formData.get('installments') as string
   const paymentMethod = parsePaymentMethod(formData.get('payment_method'))
@@ -145,7 +143,7 @@ export async function createInstallments(_: unknown, formData: FormData) {
     account_id: resolvedAccountId,
     category_id: categoryId || null,
     client_id: clientId || null,
-    project_id: projectId || null,
+    project_id: null,
     installment_group_id: groupId,
     installment_number: installment.number,
     installment_count: installmentCount,
@@ -169,7 +167,6 @@ export async function createRecurrence(_: unknown, formData: FormData) {
   const startMonthRaw = formData.get('start_month') as string
   const categoryId = (formData.get('category_id') as string) || null
   const clientId = (formData.get('client_id') as string) || null
-  const projectId = (formData.get('project_id') as string) || null
   const accountId = (formData.get('account_id') as string) || null
   const paymentMethod = parsePaymentMethod(formData.get('payment_method'))
 
@@ -195,7 +192,7 @@ export async function createRecurrence(_: unknown, formData: FormData) {
       type,
       category_id: categoryId || null,
       client_id: clientId || null,
-      project_id: projectId || null,
+      project_id: null,
       day_of_month: dayOfMonth,
       start_date: startDate,
       is_active: true,
@@ -222,7 +219,7 @@ export async function createRecurrence(_: unknown, formData: FormData) {
       account_id: resolvedAccountId,
       category_id: categoryId || null,
       client_id: clientId || null,
-      project_id: projectId || null,
+      project_id: null,
       recurrence_id: recurrence.id,
       payment_method: paymentMethod,
     })
@@ -245,7 +242,6 @@ export async function updateTransaction(_: unknown, formData: FormData) {
   const paidDate = (formData.get('paid_date') as string) || null
   const categoryId = (formData.get('category_id') as string) || null
   const clientId = (formData.get('client_id') as string) || null
-  const projectId = (formData.get('project_id') as string) || null
   const accountId = (formData.get('account_id') as string) || null
   const paymentMethod = parsePaymentMethod(formData.get('payment_method'))
 
@@ -276,7 +272,7 @@ export async function updateTransaction(_: unknown, formData: FormData) {
       account_id: resolvedAccountId,
       category_id: categoryId || null,
       client_id: clientId || null,
-      project_id: projectId || null,
+      project_id: null,
       payment_method: paymentMethod,
     })
     .eq('id', id)

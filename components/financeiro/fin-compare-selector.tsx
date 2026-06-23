@@ -10,7 +10,13 @@ const OPTIONS: { value: MetricComparisonBase; label: string }[] = [
   { value: 'yoy', label: 'vs ano ant.' },
 ]
 
-export function FinCompareSelector({ current }: { current: MetricComparisonBase }) {
+export function FinCompareSelector({
+  current,
+  period,
+}: {
+  current: MetricComparisonBase
+  period: string
+}) {
   const router = useRouter()
 
   return (
@@ -21,7 +27,7 @@ export function FinCompareSelector({ current }: { current: MetricComparisonBase 
           <button
             key={value}
             type="button"
-            onClick={() => router.push(`/financeiro/dashboard?compare=${value}`)}
+            onClick={() => router.push(`/financeiro/dashboard?period=${period}&compare=${value}`)}
             className={cn(
               'px-3 py-1.5 text-xs font-body transition-colors',
               current === value

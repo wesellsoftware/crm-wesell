@@ -82,7 +82,13 @@ function CustomTooltip({
   )
 }
 
-export function FinCashProjectionChart({ data }: { data: CashProjectionPoint[] }) {
+export function FinCashProjectionChart({
+  data,
+  selectedPeriod,
+}: {
+  data: CashProjectionPoint[]
+  selectedPeriod?: string
+}) {
   if (!data.length) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -91,7 +97,9 @@ export function FinCashProjectionChart({ data }: { data: CashProjectionPoint[] }
     )
   }
 
-  const currentLabel = data.find(d => d.isProjected)?.label
+  const selectedLabel = selectedPeriod
+    ? data.find(d => d.period === selectedPeriod)?.label
+    : data.find(d => d.isProjected)?.label
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -104,9 +112,9 @@ export function FinCashProjectionChart({ data }: { data: CashProjectionPoint[] }
           wrapperStyle={{ fontSize: 11, fontFamily: 'inherit', color: 'rgba(237,237,235,0.50)' }}
           formatter={name => (name === 'ganhos' ? 'Ganhos' : 'Despesas')}
         />
-        {currentLabel && (
+        {selectedLabel && (
           <ReferenceLine
-            x={currentLabel}
+            x={selectedLabel}
             stroke="rgba(255,255,255,0.12)"
             strokeDasharray="4 3"
           />

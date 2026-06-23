@@ -36,7 +36,6 @@ type Props = {
   categories: FinCategory[]
   banks: SelectOption[]
   clients: SelectOption[]
-  projects: SelectOption[]
   initialStatus?: 'pendente' | 'atrasado' | 'pago'
 }
 
@@ -97,7 +96,7 @@ function buildPeriodOptions() {
 
 const periodOptions = buildPeriodOptions()
 
-export function FinTransactionsTable({ rows, type, categories, banks, clients, projects, initialStatus }: Props) {
+export function FinTransactionsTable({ rows, type, categories, banks, clients, initialStatus }: Props) {
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus ?? 'todos')
   const [natureFilter, setNatureFilter] = useState<string>('todos')
   const [periodFilter, setPeriodFilter] = useState<string>('todos')
@@ -369,7 +368,6 @@ export function FinTransactionsTable({ rows, type, categories, banks, clients, p
         categories={categories}
         banks={banks}
         clients={clients}
-        projects={projects}
         transaction={editTarget}
       />
     </div>

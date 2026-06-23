@@ -114,7 +114,6 @@ type Props = {
   categories: FinCategory[]
   banks: SelectOption[]
   clients: SelectOption[]
-  projects: SelectOption[]
   transaction?: FinTransaction
 }
 
@@ -124,7 +123,6 @@ type FormBodyProps = {
   categories: FinCategory[]
   banks: SelectOption[]
   clients: SelectOption[]
-  projects: SelectOption[]
   transaction?: FinTransaction
   type: FinTransactionType
   setType: (t: FinTransactionType) => void
@@ -140,7 +138,6 @@ function FinTransactionFormBody({
   categories,
   banks,
   clients,
-  projects,
   transaction,
   type,
   setType,
@@ -479,19 +476,6 @@ function FinTransactionFormBody({
           </div>
         )}
 
-        {/* Project */}
-        {projects.length > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-we-paper/60 text-xs">Projeto <span className="text-we-paper/30">(opcional)</span></Label>
-            <CategorySelect
-              name="project_id"
-              defaultValue={transaction?.project_id ?? ''}
-              options={projects}
-              placeholder="Selecionar projeto"
-            />
-          </div>
-        )}
-
         {state?.error && (
           <p className="text-sm text-red-400">{state.error}</p>
         )}
@@ -534,7 +518,6 @@ export function FinTransactionDrawer({
   categories,
   banks,
   clients,
-  projects,
   transaction,
 }: Props) {
   const [formKey, setFormKey] = useState(0)
@@ -581,7 +564,6 @@ export function FinTransactionDrawer({
             categories={categories}
             banks={banks}
             clients={clients}
-            projects={projects}
             transaction={transaction}
             type={type}
             setType={setType}

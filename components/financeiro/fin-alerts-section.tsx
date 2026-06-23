@@ -27,15 +27,15 @@ function AlertItem({ item, href }: { item: FinAlertItem; href: string }) {
         className="flex items-center justify-between gap-3 py-1.5 group"
       >
         <div className="min-w-0">
-          <p className="font-body text-xs text-we-paper/70 truncate group-hover:text-we-paper transition-colors">
+          <p className="font-body text-xs text-we-paper truncate group-hover:text-we-paper transition-colors">
             {item.description}
           </p>
           {item.client_name && (
-            <p className="font-body text-xs text-we-paper/35 truncate">{item.client_name}</p>
+            <p className="font-body text-xs text-we-paper/70 truncate">{item.client_name}</p>
           )}
-          <p className="font-body text-xs text-we-paper/30">{formatDate(item.due_date)}</p>
+          <p className="font-body text-xs text-we-paper/60">{formatDate(item.due_date)}</p>
         </div>
-        <span className="font-mono text-xs shrink-0">{formatCurrency(item.amount)}</span>
+        <span className="font-mono text-xs text-we-paper shrink-0">{formatCurrency(item.amount)}</span>
       </Link>
     </li>
   )

@@ -119,6 +119,7 @@ export type FinDashboardData = {
   revenueByCategory: DreCategoryBreakdown[]
   cashProjection: CashProjectionPoint[]
   scorecards: DashboardScorecards
+  period: string
 }
 
 export type SelectOption = {

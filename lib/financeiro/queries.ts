@@ -30,6 +30,7 @@ import type {
 import { getTransactionEffectiveAmount } from './types'
 import { getOrgContext } from '@/lib/boards/org-context'
 import { DEFAULT_BANK_NAME, FIN_BANK_NAMES } from './banks'
+import { currentPeriod, parsePeriod, periodToDateRange } from './period'
 
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]
@@ -49,13 +50,15 @@ function monthEnd(d: Date): string {
   return toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
 }
 
-function computeCashProjection(transactions: FinTransaction[]): CashProjectionPoint[] {
-  const now = new Date()
-  const currentMonthStart = monthStart(now)
+function computeCashProjection(transactions: FinTransaction[], anchorPeriod?: string): CashProjectionPoint[] {
+  const anchor = anchorPeriod ?? currentPeriod()
+  const [ay, am] = anchor.split('-').map(Number)
+  const anchorDate = new Date(ay, am - 1, 1)
+  const currentMonthStart = monthStart(new Date())
   const points: CashProjectionPoint[] = []
 
   for (let offset = -6; offset <= 6; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    const d = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + offset, 1)
     const start = toDateStr(d)
     const end = toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
     const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -80,17 +83,23 @@ function computeCashProjection(transactions: FinTransaction[]): CashProjectionPo
 
 // ─── Monthly metrics helpers ──────────────────────────────────────────────────
 
-function computeMonthlyMetrics(transactions: FinTransaction[], months: number): MonthlyMetrics[] {
-  const now = new Date()
+function computeMonthlyMetrics(
+  transactions: FinTransaction[],
+  months: number,
+  endPeriod?: string,
+): MonthlyMetrics[] {
+  const end = endPeriod ?? currentPeriod()
+  const [ey, em] = end.split('-').map(Number)
+  const endDate = new Date(ey, em - 1, 1)
   const result: MonthlyMetrics[] = []
 
   for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const d = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1)
     const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const start = toDateStr(d)
-    const end = toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+    const endStr = toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
 
-    const monthPaid = transactions.filter(t => t.paid_date && t.paid_date >= start && t.paid_date <= end)
+    const monthPaid = transactions.filter(t => t.paid_date && t.paid_date >= start && t.paid_date <= endStr)
 
     const receita = monthPaid.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
     const despesa = monthPaid.filter(t => t.type === 'despesa').reduce((acc, t) => acc + getTransactionEffectiveAmount(t), 0)
@@ -209,13 +218,15 @@ function cohortBounds(tipo: FinMetaFaturamento['tipo_cohort'], periodo: string):
   return null
 }
 
-export async function getFinDashboardData(compare: MetricComparisonBase = 'avg3'): Promise<FinDashboardData> {
+export async function getFinDashboardData(
+  compare: MetricComparisonBase = 'avg3',
+  periodInput?: string,
+): Promise<FinDashboardData> {
   noStore()
   const supabase = await createClient()
 
-  const today = new Date()
-  const ms = monthStart(today)
-  const me = monthEnd(today)
+  const period = parsePeriod(periodInput)
+  const { start: ms, end: me } = periodToDateRange(period)
 
   const [{ data: txRaw }, { data: account }, { data: categoriesRaw }] = await Promise.all([
     supabase.from('fin_transactions').select('*').is('deleted_at', null),
@@ -228,10 +239,12 @@ export async function getFinDashboardData(compare: MetricComparisonBase = 'avg3'
 
   const paid = transactions.filter(t => t.paid_date !== null)
 
-  const balance = paid.reduce((acc, t) => {
-    const value = getTransactionEffectiveAmount(t)
-    return acc + (t.type === 'receita' ? value : -value)
-  }, initialBalance)
+  const balance = paid
+    .filter(t => t.paid_date! <= me)
+    .reduce((acc, t) => {
+      const value = getTransactionEffectiveAmount(t)
+      return acc + (t.type === 'receita' ? value : -value)
+    }, initialBalance)
 
   const thisMonthPaid = paid.filter(t => t.paid_date! >= ms && t.paid_date! <= me)
 
@@ -275,9 +288,12 @@ export async function getFinDashboardData(compare: MetricComparisonBase = 'avg3'
   }
   const revenueByCategory = [...revenueByCategoryMap.values()].sort((a, b) => b.amount - a.amount)
 
-  // 13-month series for sparklines / deltas (from already-fetched data)
-  const series = computeMonthlyMetrics(transactions, 13)
-  const history = series.slice(0, -1) // all but current month
+  // 13-month series ending at selected period; history = all but selected month
+  const [ey, em] = period.split('-').map(Number)
+  const prevEndDate = new Date(ey, em - 2, 1)
+  const prevEndPeriod = `${prevEndDate.getFullYear()}-${String(prevEndDate.getMonth() + 1).padStart(2, '0')}`
+  const series = computeMonthlyMetrics(transactions, 13, prevEndPeriod)
+  const history = series
 
   const scorecards: DashboardScorecards = {
     saldo: {
@@ -303,8 +319,9 @@ export async function getFinDashboardData(compare: MetricComparisonBase = 'avg3'
     avgTicketPerClient,
     revenueBreakdown: { recorrente, pontual },
     revenueByCategory,
-    cashProjection: computeCashProjection(transactions),
+    cashProjection: computeCashProjection(transactions, period),
     scorecards,
+    period,
   }
 }
 
@@ -414,30 +431,6 @@ export async function getFinClientsForSelect(): Promise<SelectOption[]> {
     .select('id')
     .eq('organization_id', organizationId)
     .eq('slug', 'contas')
-    .single()
-
-  if (!board) return []
-
-  const { data } = await supabase
-    .from('board_items')
-    .select('id, name')
-    .eq('board_id', board.id)
-    .is('deleted_at', null)
-    .order('name')
-
-  return (data ?? []).map(d => ({ id: d.id, name: d.name }))
-}
-
-export async function getFinProjectsForSelect(): Promise<SelectOption[]> {
-  const ctx = await getOrgContext()
-  if (!ctx) return []
-
-  const { supabase, organizationId } = ctx
-  const { data: board } = await supabase
-    .from('boards')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('slug', 'negociacoes')
     .single()
 
   if (!board) return []
