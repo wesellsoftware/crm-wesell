@@ -6,8 +6,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   addMonth,
-  buildMonthOptionsToCurrent,
-  currentPeriod,
+  buildMonthOptionsForDashboard,
+  maxSelectablePeriod,
 } from '@/lib/financeiro/period'
 import type { MetricComparisonBase } from '@/lib/financeiro/types'
 
@@ -24,9 +24,9 @@ export function FinMonthSelector({ period, compare }: Props) {
   const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<HTMLButtonElement>(null)
-  const months = buildMonthOptionsToCurrent()
-  const isCurrentMonth = period === currentPeriod()
-  const canGoNext = !isCurrentMonth
+  const months = buildMonthOptionsForDashboard()
+  const maxPeriod = maxSelectablePeriod()
+  const canGoNext = period < maxPeriod
 
   useEffect(() => {
     const container = scrollRef.current
@@ -55,7 +55,7 @@ export function FinMonthSelector({ period, compare }: Props) {
         ref={scrollRef}
         className="flex-1 flex items-center gap-1.5 overflow-x-auto scroll-smooth snap-x snap-mandatory py-1 px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {months.map(({ value, label, isCurrent }) => {
+        {months.map(({ value, label, isCurrent, isFuture }) => {
           const selected = value === period
           return (
             <button
@@ -67,7 +67,9 @@ export function FinMonthSelector({ period, compare }: Props) {
                 'shrink-0 snap-center px-3.5 py-1.5 rounded-lg font-body text-xs transition-colors whitespace-nowrap',
                 selected
                   ? 'bg-we-blue/70 text-white'
-                  : 'text-we-paper/45 hover:text-we-paper/70 hover:bg-white/[0.06]',
+                  : isFuture
+                    ? 'text-we-paper/35 hover:text-we-paper/60 hover:bg-white/[0.06] border border-dashed border-white/[0.08]'
+                    : 'text-we-paper/45 hover:text-we-paper/70 hover:bg-white/[0.06]',
               )}
             >
               {label}

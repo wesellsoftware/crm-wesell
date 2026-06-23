@@ -38,21 +38,28 @@ export default async function FinanceiroDashboardPage({
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <PageTitle>Financeiro</PageTitle>
-          <p className="font-body text-we-paper/45 text-sm mt-0.5">Visão gerencial — {periodLabel}</p>
+          <p className="font-body text-we-paper/45 text-sm mt-0.5">
+            Visão gerencial — {periodLabel}{data.projected ? ' (previsto)' : ''}
+          </p>
         </div>
         <FinCompareSelector current={compare} period={period} />
       </div>
 
       <FinMonthSelector period={period} compare={compare} />
 
-      <FinDashboardKpis scorecards={data.scorecards} monthResult={data.monthResult} periodLabel={periodLabel} />
+      <FinDashboardKpis
+        scorecards={data.scorecards}
+        monthResult={data.monthResult}
+        periodLabel={periodLabel}
+        projected={data.projected}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         <div className="xl:col-span-2 glass rounded-xl p-6 flex flex-col gap-3 min-h-[280px]">
           <div>
             <p className="font-body text-sm font-semibold text-we-paper/70">Projeção de caixa</p>
             <p className="font-body text-xs text-we-paper/35 mt-0.5">
-              6 meses realizados · 6 meses projetados · por competência
+              Por competência · 6 meses antes do mês selecionado · 6 meses de projeção futura
             </p>
           </div>
           <div className="flex-1 min-h-[200px]">
@@ -63,7 +70,9 @@ export default async function FinanceiroDashboardPage({
         <div className="glass rounded-xl p-6 flex flex-col gap-3 min-h-[280px]">
           <div>
             <p className="font-body text-sm font-semibold text-we-paper/70">Receita por natureza</p>
-            <p className="font-body text-xs text-we-paper/35 mt-0.5">Recorrente vs pontual em {periodLabel}</p>
+            <p className="font-body text-xs text-we-paper/35 mt-0.5">
+              {data.projected ? 'Previsto' : 'Realizado'} em {periodLabel}
+            </p>
           </div>
           <div className="flex-1 min-h-[200px]">
             <FinRevenueBreakdownChart
@@ -76,7 +85,9 @@ export default async function FinanceiroDashboardPage({
         <div className="glass rounded-xl p-6 flex flex-col gap-3 min-h-[280px]">
           <div>
             <p className="font-body text-sm font-semibold text-we-paper/70">Receita por categoria</p>
-            <p className="font-body text-xs text-we-paper/35 mt-0.5">Distribuição por categoria em {periodLabel}</p>
+            <p className="font-body text-xs text-we-paper/35 mt-0.5">
+              {data.projected ? 'Previsto' : 'Realizado'} em {periodLabel}
+            </p>
           </div>
           <div className="flex-1 min-h-[200px]">
             <FinRevenueByCategoryChart data={data.revenueByCategory} />

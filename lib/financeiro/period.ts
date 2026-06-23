@@ -1,4 +1,5 @@
 export const COMPANY_START_PERIOD = '2026-03'
+export const FUTURE_MONTHS_LIMIT = 6
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -20,10 +21,18 @@ function periodToDate(period: string): Date {
 }
 
 function clampPeriod(period: string): string {
-  const current = currentPeriod()
-  if (period > current) return current
+  const max = maxSelectablePeriod()
+  if (period > max) return max
   if (period < COMPANY_START_PERIOD) return COMPANY_START_PERIOD
   return period
+}
+
+export function maxSelectablePeriod(): string {
+  return shiftPeriod(currentPeriod(), FUTURE_MONTHS_LIMIT)
+}
+
+export function isFuturePeriod(period: string): boolean {
+  return period > currentPeriod()
 }
 
 export function currentPeriod(): string {
@@ -37,10 +46,23 @@ export function parsePeriod(value?: string): string {
 }
 
 export function addMonth(period: string, delta: number): string {
+  const next = shiftPeriod(period, delta)
+  return clampPeriod(next)
+}
+
+/** Avança/retrocede meses sem limitar ao intervalo permitido na UI. */
+export function shiftPeriod(period: string, delta: number): string {
   const d = periodToDate(period)
   d.setMonth(d.getMonth() + delta)
-  const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  return clampPeriod(next)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function maxPeriod(a: string, b: string): string {
+  return a >= b ? a : b
+}
+
+export function minPeriod(a: string, b: string): string {
+  return a <= b ? a : b
 }
 
 export function periodToDateRange(period: string): { start: string; end: string } {
@@ -66,6 +88,7 @@ export type MonthOption = {
   value: string
   label: string
   isCurrent: boolean
+  isFuture: boolean
 }
 
 export function buildMonthOptions(fromPeriod: string, toPeriod: string): MonthOption[] {
@@ -78,11 +101,10 @@ export function buildMonthOptions(fromPeriod: string, toPeriod: string): MonthOp
       value: p,
       label: formatPeriodShort(p),
       isCurrent: p === current,
+      isFuture: p > current,
     })
     if (p === toPeriod) break
-    const d = periodToDate(p)
-    d.setMonth(d.getMonth() + 1)
-    p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    p = shiftPeriod(p, 1)
   }
 
   return opts
@@ -90,4 +112,8 @@ export function buildMonthOptions(fromPeriod: string, toPeriod: string): MonthOp
 
 export function buildMonthOptionsToCurrent(fromPeriod: string = COMPANY_START_PERIOD): MonthOption[] {
   return buildMonthOptions(fromPeriod, currentPeriod())
+}
+
+export function buildMonthOptionsForDashboard(fromPeriod: string = COMPANY_START_PERIOD): MonthOption[] {
+  return buildMonthOptions(fromPeriod, maxSelectablePeriod())
 }

@@ -30,7 +30,7 @@ import type {
 import { getTransactionEffectiveAmount } from './types'
 import { getOrgContext } from '@/lib/boards/org-context'
 import { DEFAULT_BANK_NAME, FIN_BANK_NAMES } from './banks'
-import { currentPeriod, parsePeriod, periodToDateRange } from './period'
+import { currentPeriod, parsePeriod, periodToDateRange, maxPeriod, isFuturePeriod } from './period'
 
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]
@@ -50,18 +50,23 @@ function monthEnd(d: Date): string {
   return toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
 }
 
-function computeCashProjection(transactions: FinTransaction[], anchorPeriod?: string): CashProjectionPoint[] {
-  const anchor = anchorPeriod ?? currentPeriod()
-  const [ay, am] = anchor.split('-').map(Number)
-  const anchorDate = new Date(ay, am - 1, 1)
+function computeCashProjection(transactions: FinTransaction[], focusPeriod?: string): CashProjectionPoint[] {
+  const todayPeriod = currentPeriod()
+  const focus = focusPeriod ?? todayPeriod
   const currentMonthStart = monthStart(new Date())
-  const points: CashProjectionPoint[] = []
 
-  for (let offset = -6; offset <= 6; offset++) {
-    const d = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + offset, 1)
+  const startPeriod = maxPeriod('2026-03', shiftPeriod(focus, -6))
+  const endPeriod = shiftPeriod(todayPeriod, 6)
+
+  const points: CashProjectionPoint[] = []
+  let p = startPeriod
+
+  while (p <= endPeriod) {
+    const [y, m] = p.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
     const start = toDateStr(d)
-    const end = toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
-    const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const end = toDateStr(new Date(y, m, 0))
+    const period = p
     const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
     const isProjected = start >= currentMonthStart
 
@@ -76,6 +81,9 @@ function computeCashProjection(transactions: FinTransaction[], anchorPeriod?: st
       .reduce((acc, t) => acc + getTransactionEffectiveAmount(t), 0)
 
     points.push({ period, label, ganhos, despesas, isProjected })
+
+    if (p === endPeriod) break
+    p = shiftPeriod(p, 1)
   }
 
   return points
@@ -218,6 +226,17 @@ function cohortBounds(tipo: FinMetaFaturamento['tipo_cohort'], periodo: string):
   return null
 }
 
+function getDashboardMonthTransactions(
+  transactions: FinTransaction[],
+  period: string,
+): FinTransaction[] {
+  const { start, end } = periodToDateRange(period)
+  if (isFuturePeriod(period)) {
+    return transactions.filter(t => t.due_date >= start && t.due_date <= end)
+  }
+  return transactions.filter(t => t.paid_date !== null && t.paid_date >= start && t.paid_date <= end)
+}
+
 export async function getFinDashboardData(
   compare: MetricComparisonBase = 'avg3',
   periodInput?: string,
@@ -226,7 +245,9 @@ export async function getFinDashboardData(
   const supabase = await createClient()
 
   const period = parsePeriod(periodInput)
-  const { start: ms, end: me } = periodToDateRange(period)
+  const { end: me } = periodToDateRange(period)
+  const projected = isFuturePeriod(period)
+  const balanceEnd = projected ? periodToDateRange(currentPeriod()).end : me
 
   const [{ data: txRaw }, { data: account }, { data: categoriesRaw }] = await Promise.all([
     supabase.from('fin_transactions').select('*').is('deleted_at', null),
@@ -240,36 +261,36 @@ export async function getFinDashboardData(
   const paid = transactions.filter(t => t.paid_date !== null)
 
   const balance = paid
-    .filter(t => t.paid_date! <= me)
+    .filter(t => t.paid_date! <= balanceEnd)
     .reduce((acc, t) => {
       const value = getTransactionEffectiveAmount(t)
       return acc + (t.type === 'receita' ? value : -value)
     }, initialBalance)
 
-  const thisMonthPaid = paid.filter(t => t.paid_date! >= ms && t.paid_date! <= me)
+  const thisMonthTx = getDashboardMonthTransactions(transactions, period)
 
-  const monthRevenue = thisMonthPaid
+  const monthRevenue = thisMonthTx
     .filter(t => t.type === 'receita')
     .reduce((acc, t) => acc + t.amount, 0)
 
-  const monthExpense = thisMonthPaid
+  const monthExpense = thisMonthTx
     .filter(t => t.type === 'despesa')
     .reduce((acc, t) => acc + getTransactionEffectiveAmount(t), 0)
 
-  const mrr = thisMonthPaid
+  const mrr = thisMonthTx
     .filter(t => t.type === 'receita' && t.nature === 'recorrente')
     .reduce((acc, t) => acc + t.amount, 0)
 
-  const revenueThisMonth = thisMonthPaid.filter(t => t.type === 'receita')
+  const revenueThisMonth = thisMonthTx.filter(t => t.type === 'receita')
   const distinctClients = new Set(
     revenueThisMonth.filter(t => t.client_id).map(t => t.client_id),
   ).size
   const avgTicketPerClient = distinctClients > 0 ? monthRevenue / distinctClients : 0
 
-  const recorrente = thisMonthPaid
+  const recorrente = thisMonthTx
     .filter(t => t.type === 'receita' && t.nature === 'recorrente')
     .reduce((acc, t) => acc + t.amount, 0)
-  const pontual = thisMonthPaid
+  const pontual = thisMonthTx
     .filter(t => t.type === 'receita' && t.nature === 'pontual')
     .reduce((acc, t) => acc + t.amount, 0)
 
@@ -322,6 +343,7 @@ export async function getFinDashboardData(
     cashProjection: computeCashProjection(transactions, period),
     scorecards,
     period,
+    projected,
   }
 }
 

@@ -120,6 +120,7 @@ export type FinDashboardData = {
   cashProjection: CashProjectionPoint[]
   scorecards: DashboardScorecards
   period: string
+  projected: boolean
 }
 
 export type SelectOption = {
